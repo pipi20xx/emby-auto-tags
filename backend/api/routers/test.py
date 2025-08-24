@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, Body
 from pydantic import BaseModel
 from typing import List, Literal
 from services import tmdb_service, emby_service, rule_service
+from core.constants import COUNTRY_CODE_MAP # 导入国家代码中文映射
 
 router = APIRouter(prefix="/test", tags=["Tests"])
 
@@ -123,12 +124,36 @@ async def test_full_flow_preview(request: FullFlowRequest = Body(...)):
     if not details:
         raise HTTPException(status_code=404, detail=f"无法从 TMDB 获取 TMDB ID 为 {request.tmdb_id} 的信息。")
 
-    # 2. 提取所需数据
+    # 2. 提取所需数据 (与 emby_service.py 保持一致)
     genre_ids = [genre['id'] for genre in details.get('genres', [])]
-    countries = [country['iso_3166_1'] for country in details.get('production_countries', [])]
+    countries = []
     
+    # 统一电影和剧集的国家提取逻辑 (与 emby_service.py 保持一致)
+    # 优先级: origin_country -> original_language
+    origin_country = details.get('origin_country')
+    if origin_country:
+        if isinstance(origin_country, list):
+            countries = origin_country
+        elif isinstance(origin_country, str):
+            countries = [origin_country]
+    
+    if not countries:
+        original_language = details.get('original_language')
+        if original_language:
+            # 简单的语言到国家映射
+            lang_to_country_map = {
+                "en": "US", "zh": "CN", "ja": "JP", "ko": "KR",
+                "fr": "FR", "de": "DE", "es": "ES", "it": "IT",
+                "hi": "IN", "ar": "SA", "pt": "BR", "ru": "RU",
+                "th": "TH", "sv": "SE", "da": "DK", "no": "NO",
+                "nl": "NL", "pl": "PL",
+            }
+            mapped_country = lang_to_country_map.get(original_language)
+            if mapped_country:
+                countries = [mapped_country]
+
     # 3. 根据规则生成标签
-    generated_tags = rule_service.generate_tags(countries, genre_ids)
+    generated_tags = rule_service.generate_tags(countries, genre_ids, request.media_type)
 
     # 4. 查找 Emby 项目以提供更丰富的预览信息
     emby_items = emby_service.find_emby_items_by_tmdb_id(request.tmdb_id, item_type=media_type_emby)
@@ -148,6 +173,9 @@ async def test_full_flow_preview(request: FullFlowRequest = Body(...)):
                 "original_tags": original_tags
             })
 
+    # 为了在预览中显示中文国家名，使用预定义的 COUNTRY_CODE_MAP
+    countries_display = [COUNTRY_CODE_MAP.get(code, code) for code in countries]
+
     return {
         "status": "success",
         "tmdb_id": request.tmdb_id,
@@ -158,6 +186,6 @@ async def test_full_flow_preview(request: FullFlowRequest = Body(...)):
             "title": details.get('title') or details.get('name'),
             "release_date": details.get('release_date') or details.get('first_air_date'),
             "genres": [g['name'] for g in details.get('genres', [])],
-            "countries": [c['name'] for c in details.get('production_countries', [])]
+            "countries": countries_display # 显示处理过的中文国家名
         }
     }
