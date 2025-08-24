@@ -39,6 +39,7 @@
 - **全面的 Web 管理面板**: 轻松完成所有配置、规则设定和功能测试。
 - **TMDB 集成**: 利用 The Movie Database (TMDB) 的数据来丰富媒体信息。
 - **Docker 支持**：易于通过 Docker 和 Docker Compose 进行部署。
+- **自定义标签**：通过TMDB返还的信息提取地区和类型来进行自定义标签操作。
 
 ## 快速开始
 
@@ -61,7 +62,10 @@ services:
 
 webhook通知选择类型为JSON
 ![alt text](img/image.png)
-## 技术栈
 
-- **后端**: Python (FastAPI)
-- **部署**: Docker
+## 🙏 致谢
+
+本项目的设计和功能受到了以下优秀项目的启发，特此感谢：
+
+- **[kuroyukihime0/emby_scripts](https://github.com/kuroyukihime0/emby_scripts)**
+---
