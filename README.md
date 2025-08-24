@@ -40,8 +40,8 @@ services:
     network_mode: bridge
 ```
 
-WEBHOOK通知类型选择JSON
-[alt text](img/image.png)
+webhook通知选择类型为JSON
+![alt text](img/image.png)
 ## 技术栈
 
 - **后端**: Python (FastAPI)
