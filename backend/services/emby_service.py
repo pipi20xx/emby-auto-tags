@@ -275,7 +275,10 @@ async def tag_all_media_items(mode: Literal['merge', 'overwrite'] = 'merge') -> 
             # 2. 根据规则生成标签
             genre_ids = [genre['id'] for genre in details.get('genres', [])]
             countries = [country['iso_3166_1'] for country in details.get('production_countries', [])]
-            generated_tags = rule_service.generate_tags(countries, genre_ids)
+            
+            # 将 Emby 的 ItemType 转换为后端规则使用的 item_type ("movie" 或 "series")
+            rule_item_type = 'movie' if item_type == 'Movie' else 'series' if item_type == 'Series' else 'all'
+            generated_tags = rule_service.generate_tags(countries, genre_ids, rule_item_type)
 
             if not generated_tags:
                 logger.info(f"项目 '{item_name}' 未生成任何标签，跳过更新。")

@@ -28,9 +28,10 @@ def save_rules_to_file(rules: List[Dict[str, Any]]) -> bool:
         print(f"写入 rules.json 时出错: {e}")
         return False
 
-def generate_tags(countries: List[str], genre_ids: List[int]) -> List[str]:
+def generate_tags(countries: List[str], genre_ids: List[int], item_type: str) -> List[str]:
     """
-    根据国家和类型 ID 生成标签。
+    根据国家、类型 ID 和媒体类型生成标签。
+    item_type: "movie", "series", "all"
     """
     rules = load_rules_from_file()
     generated_tags = set()
@@ -42,6 +43,7 @@ def generate_tags(countries: List[str], genre_ids: List[int]) -> List[str]:
         conditions = rule.get("conditions", {})
         rule_countries = conditions.get("countries", [])
         rule_genre_ids = conditions.get("genre_ids", [])
+        rule_item_type = rule.get("item_type", "all") # 默认为 "all"
 
         # 如果规则中既没有国家也没有类型，则跳过
         if not rule_countries and not rule_genre_ids:
@@ -55,8 +57,12 @@ def generate_tags(countries: List[str], genre_ids: List[int]) -> List[str]:
         # 如果规则中定义了类型，则必须匹配；如果未定义，则视为通过
         genre_match = (not rule_genre_ids) or any(gid in rule_genre_ids for gid in genre_ids)
 
-        # 必须同时满足国家和类型条件（如果它们被定义的话）
-        if country_match and genre_match:
+        # 检查媒体类型匹配
+        # 如果规则的 item_type 是 "all"，或者与当前 item_type 匹配，则通过
+        type_match = (rule_item_type == "all") or (rule_item_type == item_type)
+
+        # 必须同时满足国家、类型和媒体类型条件（如果它们被定义的话）
+        if country_match and genre_match and type_match:
             generated_tags.add(rule["tag"])
 
     return list(generated_tags)

@@ -296,6 +296,7 @@ async def management_page():
                     <th>生成的标签</th>
                     <th>国家/地区</th>
                     <th>类型</th>
+                    <th>作用于</th>
                     <th>操作</th>
                 </tr>
             </thead>
@@ -392,6 +393,12 @@ async def management_page():
                 <div id="rule-countries-container" class="checkbox-container"></div>
                 <label>类型:</label>
                 <div id="rule-genres-container" class="checkbox-container"></div>
+                <label for="rule-item-type">作用于:</label>
+                <select id="rule-item-type">
+                    <option value="all">全部</option>
+                    <option value="movie">电影</option>
+                    <option value="series">剧集</option>
+                </select>
                 <button type="submit">保存规则</button>
             </form>
         </div>
@@ -667,12 +674,19 @@ document.addEventListener('DOMContentLoaded', function() {
             const countryNames = (rule.conditions.countries || []).map(code => dataMaps.countries[code] || code).join(', ');
             const genreNames = (rule.conditions.genre_ids || []).map(id => dataMaps.genres[id] || id).join(', ');
 
+            const itemTypeDisplay = {
+                "movie": "电影",
+                "series": "剧集",
+                "all": "全部"
+            }[rule.item_type] || "全部"; // Display name for item_type
+
             const row = rulesTableBody.insertRow();
             row.innerHTML = `
                 <td>${rule.name || ''}</td>
                 <td>${rule.tag || ''}</td>
                 <td>${countryNames}</td>
                 <td>${genreNames}</td>
+                <td>${itemTypeDisplay}</td>
                 <td class="actions-cell">
                     <button class="edit-rule-btn" data-index="${index}">编辑</button>
                     <button class="delete-rule-btn" data-index="${index}">删除</button>
@@ -721,10 +735,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (checkbox) checkbox.checked = true;
             });
 
+            // Set item_type
+            document.getElementById('rule-item-type').value = rule.item_type || 'all';
+
         } else {
             // Add mode
             modalTitle.textContent = '添加新规则';
             document.getElementById('rule-index').value = '';
+            document.getElementById('rule-item-type').value = 'all'; // Default for new rules
         }
         ruleModal.classList.remove('hidden');
     }
@@ -770,8 +788,9 @@ document.addEventListener('DOMContentLoaded', function() {
         
         const selectedCountries = Array.from(ruleForm.querySelectorAll('input[name="countries"]:checked')).map(cb => cb.value);
         const selectedGenreIds = Array.from(ruleForm.querySelectorAll('input[name="genres"]:checked')).map(cb => parseInt(cb.value, 10));
+        const itemType = document.getElementById('rule-item-type').value;
 
-        const newRule = { name, tag, conditions: { countries: selectedCountries, genre_ids: selectedGenreIds } };
+        const newRule = { name, tag, conditions: { countries: selectedCountries, genre_ids: selectedGenreIds }, item_type: itemType };
 
         if (index) {
             // Update existing rule
