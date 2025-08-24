@@ -2,3 +2,5 @@ fastapi
 uvicorn[standard]
 requests
 pydantic
+ratelimit
+backoff

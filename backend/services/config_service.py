@@ -26,15 +26,28 @@ def get_config() -> dict:
         config.set('WEBHOOK', 'secret_token', token)
         needs_saving = True
 
+    # --- TMDB 限流配置自动生成 ---
+    if not config.has_section('TMDB'):
+        config.add_section('TMDB')
+        needs_saving = True
+    if not config.has_option('TMDB', 'rate_limit_period'):
+        config.set('TMDB', 'rate_limit_period', '1.0') # 默认1秒1次，0表示不限制
+        needs_saving = True
+
     if needs_saving:
         try:
             with open(CONFIG_FILE_PATH, 'w', encoding='utf-8') as configfile:
                 config.write(configfile)
-            print("已自动生成并保存 Webhook 配置。")
+            print("已自动生成并保存 Webhook/TMDB 限流配置。")
         except IOError as e:
-            print(f"自动保存 Webhook 配置时出错: {e}")
+            print(f"自动保存 Webhook/TMDB 限流配置时出错: {e}")
     
     config_dict = {section: dict(config.items(section)) for section in config.sections()}
+    
+    # 中文化 TMDB 配置项
+    if 'TMDB' in config_dict and 'rate_limit_period' in config_dict['TMDB']:
+        config_dict['TMDB']['TMDB 访问频率限制周期'] = config_dict['TMDB'].pop('rate_limit_period')
+        
     return config_dict
 
 def update_config(config_data: dict):

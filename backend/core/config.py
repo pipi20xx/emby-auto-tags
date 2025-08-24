@@ -27,7 +27,8 @@ def create_default_config(path):
         'user_id': 'your_emby_user_id'
     }
     config_obj['TMDB'] = {
-        'api_key': 'your_tmdb_api_key'
+        'api_key': 'your_tmdb_api_key',
+        'rate_limit_period': '1.0' # 默认1秒1次，0表示不限制
     }
     config_obj['PROXY'] = {
         'http_proxy': ''
@@ -59,6 +60,7 @@ EMBY_USER_ID = config.get('EMBY', 'user_id', fallback=None)
 # --- TMDB 配置 ---
 TMDB_API_KEY = config.get('TMDB', 'api_key', fallback=None)
 TMDB_API_BASE_URL = "https://api.themoviedb.org/3"
+TMDB_RATE_LIMIT_PERIOD = float(config.get('TMDB', 'rate_limit_period', fallback='1.0'))
 
 # --- 代理配置 ---
 HTTP_PROXY = config.get('PROXY', 'http_proxy', fallback=None)
