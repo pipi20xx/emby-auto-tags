@@ -56,6 +56,9 @@ def update_config(config_data: dict):
     
     # 从字典数据填充 configparser 对象
     for section, values in config_data.items():
+        # 处理 TMDB 配置项的中文化转换
+        if section == 'TMDB' and 'TMDB 访问频率限制周期' in values:
+            values['rate_limit_period'] = values.pop('TMDB 访问频率限制周期')
         config[section] = values
         
     # 将更新后的配置写回文件
