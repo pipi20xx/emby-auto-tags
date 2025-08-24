@@ -1,0 +1,35 @@
+{
+  "rules": [
+    {
+      "name": "热门日韩剧",
+      "tag": "日本",
+      "conditions": {
+        "countries": [
+          "KR",
+          "JP"
+        ],
+        "genre_ids": []
+      }
+    },
+    {
+      "name": "国产剧",
+      "conditions": {
+        "countries": [
+          "CN"
+        ],
+        "genre_ids": []
+      },
+      "tag": "国产剧"
+    },
+    {
+      "name": "d动画",
+      "tag": "这是一个测试动画",
+      "conditions": {
+        "countries": [],
+        "genre_ids": [
+          16
+        ]
+      }
+    }
+  ]
+}

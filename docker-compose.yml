@@ -1,0 +1,11 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+    ports:
+      - "6005:8000"
+    volumes:
+      - ./config:/app/config
+    restart: unless-stopped
