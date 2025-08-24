@@ -230,6 +230,76 @@ def clear_all_item_tags() -> dict:
         "failed_count": failed_count
     }
 
+async def tag_all_media_items(mode: Literal['merge', 'overwrite'] = 'merge') -> dict:
+    """
+    遍历所有 Emby 媒体库中的电影和剧集，根据规则进行打标签。
+    """
+    from services import tmdb_service, rule_service # 避免循环引用
+    import logging
+
+    logger = logging.getLogger(__name__)
+
+    logger.info(f"开始对所有 Emby 媒体项目进行打标签操作 (模式: {mode})...")
+    all_items = get_all_emby_items()
+    
+    processed_count = 0
+    updated_count = 0
+    failed_count = 0
+    
+    for item in all_items:
+        item_id = item.get('Id')
+        item_name = item.get('Name')
+        item_type = item.get('Type') # "Movie" or "Series"
+        tmdb_id = item.get('ProviderIds', {}).get('Tmdb')
+
+        if not all([item_id, item_name, item_type, tmdb_id]):
+            logger.warning(f"跳过项目 '{item_name}' (ID: {item_id})，缺少关键信息。")
+            continue
+
+        logger.info(f"正在处理项目 '{item_name}' (ID: {item_id}, TMDB ID: {tmdb_id}, 类型: {item_type})...")
+        processed_count += 1
+
+        try:
+            # 1. 从 TMDB 获取详细信息
+            media_type_tmdb = 'movie' if item_type == 'Movie' else 'tv' if item_type == 'Series' else None
+            if not media_type_tmdb:
+                logger.warning(f"不支持的媒体类型: {item_type}，跳过处理。")
+                continue
+
+            details = tmdb_service.get_tmdb_details(tmdb_id, media_type_tmdb)
+            if not details:
+                logger.warning(f"无法从 TMDB 获取项目 '{item_name}' (TMDB ID: {tmdb_id}) 的信息，跳过。")
+                failed_count += 1
+                continue
+
+            # 2. 根据规则生成标签
+            genre_ids = [genre['id'] for genre in details.get('genres', [])]
+            countries = [country['iso_3166_1'] for country in details.get('production_countries', [])]
+            generated_tags = rule_service.generate_tags(countries, genre_ids)
+
+            if not generated_tags:
+                logger.info(f"项目 '{item_name}' 未生成任何标签，跳过更新。")
+                continue
+
+            # 3. 更新 Emby 项目的元数据
+            if update_item_metadata(item_id=item_id, tags_to_set=generated_tags, mode=mode):
+                updated_count += 1
+            else:
+                failed_count += 1
+
+        except Exception as e:
+            logger.error(f"处理项目 '{item_name}' (ID: {item_id}) 时发生错误: {e}")
+            failed_count += 1
+
+    logger.info(f"所有媒体项目打标签完成。总处理 {processed_count} 个，成功更新 {updated_count} 个，失败 {failed_count} 个。")
+    return {
+        "status": "completed",
+        "processed_count": processed_count,
+        "updated_count": updated_count,
+        "failed_count": failed_count,
+        "mode": mode
+    }
+
 # 为了向后兼容旧的测试路由，保留此函数，但让它调用新的核心函数
 def update_item_tags(item_id: str, new_tags: List[str]):
     """

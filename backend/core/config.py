@@ -1,9 +1,21 @@
 import configparser
 import os
+from datetime import datetime, timezone, timedelta
 
 # --- 配置文件路径 ---
 # 在容器内的路径
 CONFIG_FILE_PATH = "/app/config/config.ini"
+
+def get_current_time() -> str:
+    """
+    获取当前时间，并格式化为 ISO 8601 字符串，包含时区信息。
+    """
+    # 使用 UTC 时间，并转换为上海时区 (UTC+8)
+    utc_now = datetime.now(timezone.utc)
+    shanghai_tz = timezone(timedelta(hours=8))
+    shanghai_now = utc_now.astimezone(shanghai_tz)
+    return shanghai_now.isoformat()
+
 
 # --- 默认配置 ---
 def create_default_config(path):

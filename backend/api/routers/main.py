@@ -1,7 +1,12 @@
-from fastapi import APIRouter, HTTPException, Body
-from typing import Dict, Any
+from fastapi import APIRouter, HTTPException, Body, BackgroundTasks, Request
+from typing import Dict, Any, Literal
 from services import config_service, tmdb_service, rule_service, emby_service
+from core import config as core_config # 导入 core.config 并重命名以避免与 config_service 冲突
 from fastapi.responses import HTMLResponse, RedirectResponse
+import uuid
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -11,6 +16,59 @@ async def root():
     根路由，重定向到管理页面。
     """
     return RedirectResponse(url="/api/manage")
+
+async def _run_tag_all_media_task(task_id: str, mode: Literal['merge', 'overwrite'], task_manager: Dict[str, Any]):
+    """
+    实际执行打标签任务的后台函数。
+    """
+    try:
+        task_manager[task_id]["status"] = "running"
+        logger.info(f"任务 {task_id}: 开始对所有媒体进行打标签操作 (模式: {mode})...")
+        result = await emby_service.tag_all_media_items(mode=mode)
+        task_manager[task_id].update(result)
+        task_manager[task_id]["status"] = "completed"
+        logger.info(f"任务 {task_id}: 打标签任务完成。结果: {result}")
+    except Exception as e:
+        task_manager[task_id]["status"] = "failed"
+        task_manager[task_id]["error"] = str(e)
+        logger.error(f"任务 {task_id}: 打标签任务失败: {e}")
+
+@router.post("/tag_all_media")
+async def tag_all_media(
+    request: Request,
+    background_tasks: BackgroundTasks,
+    mode: Literal['merge', 'overwrite'] = Body('merge', embed=True)
+):
+    """
+    触发对所有 Emby 媒体库中的电影和剧集进行打标签操作。
+    操作将在后台执行。
+    """
+    task_id = str(uuid.uuid4())
+    task_manager = request.app.state.task_manager
+    task_manager[task_id] = {
+        "task_id": task_id,
+        "status": "pending",
+        "mode": mode,
+        "processed_count": 0,
+        "updated_count": 0,
+        "failed_count": 0,
+        "start_time": core_config.get_current_time()
+    }
+    
+    logger.info(f"收到请求：启动后台打标签任务 {task_id} (模式: {mode})...")
+    background_tasks.add_task(_run_tag_all_media_task, task_id, mode, task_manager)
+    return {"message": "打标签任务已在后台启动。", "task_id": task_id}
+
+@router.get("/tag_all_media/status/{task_id}")
+async def get_tag_all_media_status(request: Request, task_id: str):
+    """
+    获取指定打标签任务的当前状态。
+    """
+    task_manager = request.app.state.task_manager
+    task_status = task_manager.get(task_id)
+    if not task_status:
+        raise HTTPException(status_code=404, detail="Task not found.")
+    return task_status
 
 @router.post("/webhook/{token}")
 async def receive_webhook(token: str, payload: Dict[Any, Any] = Body(...)):
@@ -286,6 +344,21 @@ async def management_page():
         <p style="color: red; font-weight: bold;">警告: 此操作将清除 Emby 媒体库中所有电影和剧集的标签，不可撤销！</p>
         <button type="button" id="clear-all-tags-btn" style="background-color: #e74c3c;">确认清除所有标签</button>
         <div id="clear-all-tags-result" class="result hidden"></div>
+    </div>
+
+    <!-- 一键打标签 -->
+    <div class="container">
+        <h2>一键为所有媒体打标签</h2>
+        <p>此功能将遍历 Emby 媒体库中所有电影和剧集，根据已配置的规则自动生成并应用标签。</p>
+        <div style="margin-bottom: 15px;">
+            <label style="font-weight: bold;">写入模式:</label>
+            <div style="padding-left: 10px;">
+                <label style="display: inline-block; margin-right: 20px; font-weight: normal;"><input type="radio" name="tag-all-media-mode" value="merge" checked> 合并现有标签</label>
+                <label style="display: inline-block; font-weight: normal;"><input type="radio" name="tag-all-media-mode" value="overwrite"> 覆盖所有标签</label>
+            </div>
+        </div>
+        <button type="button" id="tag-all-media-btn" style="background-color: #27ae60;">开始一键打标签</button>
+        <div id="tag-all-media-result" class="result hidden"></div>
     </div>
 
     <!-- 整合测试 -->
@@ -839,6 +912,96 @@ document.addEventListener('DOMContentLoaded', function() {
             showResult(clearAllTagsResult, `错误: ${error.message}`, true);
         } finally {
             showLoading(clearAllTagsBtn, false);
+        }
+    });
+
+    // --- 一键打标签功能 ---
+    const tagAllMediaBtn = document.getElementById('tag-all-media-btn');
+    const tagAllMediaResult = document.getElementById('tag-all-media-result');
+    const tagAllMediaModeRadios = document.querySelectorAll('input[name="tag-all-media-mode"]');
+
+    let currentTagAllMediaTaskId = null;
+    let tagAllMediaPollingInterval = null;
+
+    async function pollTagAllMediaStatus(taskId) {
+        if (!taskId) return;
+
+        try {
+            const response = await fetch(`${apiPrefix}/tag_all_media/status/${taskId}`);
+            const result = await response.json();
+
+            if (!response.ok) {
+                showResult(tagAllMediaResult, `错误: 无法获取任务状态 - ${result.detail || '未知错误'}`, true);
+                clearInterval(tagAllMediaPollingInterval);
+                showLoading(tagAllMediaBtn, false);
+                return;
+            }
+
+            let statusMessage = `
+                <h4>任务状态: ${result.status}</h4>
+                <p>模式: ${result.mode === 'merge' ? '合并' : '覆盖'}</p>
+                <p>已处理项目: ${result.processed_count}</p>
+                <p>已更新项目: ${result.updated_count}</p>
+                <p>失败项目: ${result.failed_count}</p>
+            `;
+
+            if (result.status === 'completed') {
+                statusMessage += `<p style="color: green; font-weight: bold;">打标签任务已完成！</p>`;
+                clearInterval(tagAllMediaPollingInterval);
+                showLoading(tagAllMediaBtn, false);
+            } else if (result.status === 'failed') {
+                statusMessage += `<p style="color: red; font-weight: bold;">打标签任务失败: ${result.error || '未知错误'}</p>`;
+                clearInterval(tagAllMediaPollingInterval);
+                showLoading(tagAllMediaBtn, false);
+            } else {
+                statusMessage += `<p>任务正在进行中...</p>`;
+            }
+            showResult(tagAllMediaResult, statusMessage);
+
+        } catch (error) {
+            showResult(tagAllMediaResult, `错误: 轮询任务状态失败 - ${error.message}`, true);
+            clearInterval(tagAllMediaPollingInterval);
+            showLoading(tagAllMediaBtn, false);
+        }
+    }
+
+    tagAllMediaBtn.addEventListener('click', async () => {
+        const mode = document.querySelector('input[name="tag-all-media-mode"]:checked').value;
+        if (!confirm(`您确定要以 [${mode === 'merge' ? '合并' : '覆盖'}] 模式，对所有 Emby 媒体库中的电影和剧集进行打标签操作吗？此操作将在后台执行，并在页面上显示进度。`)) {
+            return;
+        }
+
+        showLoading(tagAllMediaBtn);
+        tagAllMediaResult.classList.add('hidden');
+        
+        // 清除之前的轮询
+        if (tagAllMediaPollingInterval) {
+            clearInterval(tagAllMediaPollingInterval);
+        }
+
+        try {
+            const response = await fetch(`${apiPrefix}/tag_all_media`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ mode: mode })
+            });
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.detail || '启动任务失败');
+
+            currentTagAllMediaTaskId = result.task_id;
+            showResult(tagAllMediaResult, `
+                <h4>任务启动成功:</h4>
+                <p style="color: green;">打标签任务已在后台启动，任务ID: <code>${currentTagAllMediaTaskId}</code></p>
+                <p>正在获取任务进度...</p>
+            `);
+
+            // 启动轮询
+            tagAllMediaPollingInterval = setInterval(() => pollTagAllMediaStatus(currentTagAllMediaTaskId), 3000); // 每3秒轮询一次
+            pollTagAllMediaStatus(currentTagAllMediaTaskId); // 立即执行一次
+            
+        } catch (error) {
+            showResult(tagAllMediaResult, `错误: ${error.message}`, true);
+            showLoading(tagAllMediaBtn, false);
         }
     });
 
