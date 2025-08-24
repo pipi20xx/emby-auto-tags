@@ -7,7 +7,7 @@
 <details>
 <summary>点击展开/折叠</summary>
 
-- **v1.0.0 (YYYY-MM-DD)**
+- **v1.0.0 (2025-08-24)**
   - 项目初始化。
 
 </details>
@@ -40,6 +40,8 @@ services:
     network_mode: bridge
 ```
 
+WEBHOOK通知类型选择JSON
+[alt text](img/image.png)
 ## 技术栈
 
 - **后端**: Python (FastAPI)
