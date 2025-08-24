@@ -5,6 +5,22 @@ from services import tmdb_service, emby_service, rule_service
 
 router = APIRouter(prefix="/test", tags=["Tests"])
 
+@router.post("/clear-all-tags")
+async def clear_all_emby_tags():
+    """
+    清除 Emby 媒体库中所有电影和剧集的标签。
+    """
+    result = emby_service.clear_all_item_tags()
+    if result["success"]:
+        return {
+            "status": "success",
+            "message": f"成功清除 {result['cleared_count']} 个项目的标签，{result['failed_count']} 个项目清除失败。",
+            "cleared_count": result['cleared_count'],
+            "failed_count": result['failed_count']
+        }
+    else:
+        raise HTTPException(status_code=500, detail="清除所有标签时发生错误。")
+
 @router.post("/tmdb")
 async def test_tmdb_fetch(tmdb_id: str = Body(..., embed=True), media_type: str = Body(..., embed=True)):
     """测试 TMDB 信息获取并返回提取后的关键信息"""

@@ -159,6 +159,78 @@ def update_item_metadata(
         return False
 
 # 为了向后兼容旧的测试路由，保留此函数，但让它调用新的核心函数
+def get_all_emby_items(item_type: str = "Movie,Series") -> List[dict]:
+    """
+    获取 Emby 中所有指定类型的媒体项目。
+    :param item_type: Emby 的媒体类型, 例如 "Movie", "Series", 或 "Movie,Series"
+    """
+    if not config.EMBY_SERVER_URL:
+        print("错误: EMBY_SERVER_URL 未配置")
+        return []
+
+    user_id = _get_user_id()
+    if not user_id:
+        print("错误: 无法获取 Emby UserID，无法继续查找。")
+        return []
+
+    url = f"{config.EMBY_SERVER_URL}/emby/Users/{user_id}/Items"
+    params = {
+        'Recursive': 'true',
+        'IncludeItemTypes': item_type,
+        'Fields': 'ProviderIds,Tags,TagItems,LockedFields',
+        'Limit': 10000 # 增加限制以获取更多项目，Emby API 默认可能只有少量
+    }
+    
+    all_items = []
+    start_index = 0
+    while True:
+        current_params = params.copy()
+        current_params['StartIndex'] = start_index
+        try:
+            response = requests.get(url, headers=_get_headers(), params=current_params)
+            response.raise_for_status()
+            data = response.json()
+            items = data.get('Items', [])
+            all_items.extend(items)
+            
+            if len(items) < params['Limit']: # 如果返回的项目少于限制，说明已经获取完所有项目
+                break
+            start_index += params['Limit']
+        except requests.exceptions.RequestException as e:
+            print(f"获取所有 Emby 项目时出错: {e}")
+            return []
+    return all_items
+
+def clear_all_item_tags() -> dict:
+    """
+    清除 Emby 媒体库中所有电影和剧集的标签。
+    """
+    print("开始清除所有 Emby 媒体项目的标签...")
+    all_items = get_all_emby_items()
+    
+    cleared_count = 0
+    failed_count = 0
+    
+    for item in all_items:
+        item_id = item.get('Id')
+        item_name = item.get('Name')
+        if item_id:
+            print(f"正在清除项目 '{item_name}' (ID: {item_id}) 的标签...")
+            if update_item_metadata(item_id, [], mode='overwrite'):
+                cleared_count += 1
+            else:
+                failed_count += 1
+        else:
+            print(f"警告: 发现一个没有 ID 的项目: {item}")
+
+    print(f"清除完成。成功清除 {cleared_count} 个项目的标签，{failed_count} 个项目清除失败。")
+    return {
+        "success": True,
+        "cleared_count": cleared_count,
+        "failed_count": failed_count
+    }
+
+# 为了向后兼容旧的测试路由，保留此函数，但让它调用新的核心函数
 def update_item_tags(item_id: str, new_tags: List[str]):
     """
     更新指定 Emby 项目的标签（简化版，总是使用合并模式）。

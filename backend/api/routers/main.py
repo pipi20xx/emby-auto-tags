@@ -280,6 +280,14 @@ async def management_page():
         <div id="emby-result" class="result hidden"></div>
     </div>
 
+    <!-- 清除所有标签 -->
+    <div class="container">
+        <h2>清除所有 Emby 媒体库标签</h2>
+        <p style="color: red; font-weight: bold;">警告: 此操作将清除 Emby 媒体库中所有电影和剧集的标签，不可撤销！</p>
+        <button type="button" id="clear-all-tags-btn" style="background-color: #e74c3c;">确认清除所有标签</button>
+        <div id="clear-all-tags-result" class="result hidden"></div>
+    </div>
+
     <!-- 整合测试 -->
     <div class="container">
         <h2>整合流程测试</h2>
@@ -801,6 +809,38 @@ document.addEventListener('DOMContentLoaded', function() {
 
     embyTestBtn.addEventListener('click', () => handleEmbyWrite(true));
     embyWriteBtn.addEventListener('click', () => handleEmbyWrite(false));
+
+    // --- 清除所有标签功能 ---
+    const clearAllTagsBtn = document.getElementById('clear-all-tags-btn');
+    const clearAllTagsResult = document.getElementById('clear-all-tags-result');
+
+    clearAllTagsBtn.addEventListener('click', async () => {
+        if (!confirm("您确定要清除 Emby 媒体库中所有电影和剧集的标签吗？此操作不可撤销！")) {
+            return;
+        }
+
+        showLoading(clearAllTagsBtn);
+        clearAllTagsResult.classList.add('hidden');
+        try {
+            const response = await fetch(`${apiPrefix}/test/clear-all-tags`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.detail || '清除失败');
+
+            showResult(clearAllTagsResult, `
+                <h4>清除结果:</h4>
+                <p style="color: green;">${result.message}</p>
+                <p>成功清除: ${result.cleared_count} 个项目</p>
+                <p>清除失败: ${result.failed_count} 个项目</p>
+            `);
+        } catch (error) {
+            showResult(clearAllTagsResult, `错误: ${error.message}`, true);
+        } finally {
+            showLoading(clearAllTagsBtn, false);
+        }
+    });
 
     // --- 整合测试 ---
     const fullFlowForm = document.getElementById('full-flow-form');
