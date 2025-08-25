@@ -3,6 +3,18 @@ document.addEventListener('DOMContentLoaded', function() {
     let dataMaps = { countries: {}, genres: {} };
 
     // --- 通用函数 ---
+    function showToast(message, isError = false) {
+        Toastify({
+            text: message,
+            duration: 3000,
+            close: true,
+            gravity: "top", // `top` or `bottom`
+            position: "right", // `left`, `center` or `right`
+            backgroundColor: isError ? "linear-gradient(to right, #ff5f6d, #ffc371)" : "linear-gradient(to right, #00b09b, #96c93d)",
+            stopOnFocus: true, // Prevents dismissing of toast on hover
+        }).showToast();
+    }
+
     function showResult(element, message, isError = false) {
         element.innerHTML = message;
         element.style.color = isError ? 'red' : 'green';
@@ -59,8 +71,7 @@ document.addEventListener('DOMContentLoaded', function() {
     copyWebhookUrlBtn.addEventListener('click', () => {
         webhookUrlInput.select();
         document.execCommand('copy');
-        showResult(webhookResult, 'URL 已复制到剪贴板！');
-        setTimeout(() => webhookResult.classList.add('hidden'), 2000);
+        showToast('URL 已复制到剪贴板！');
     });
 
     async function saveWebhookSwitch(key, value) {
@@ -76,9 +87,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 const result = await response.json();
                 if (!response.ok) throw new Error(result.detail || '保存失败');
                 const statusText = key === 'enabled' ? '接收器' : '自动化处理';
-                showResult(webhookResult, `${statusText}状态已更新为: ${value ? '启用' : '禁用'}`);
+                showToast(`${statusText}状态已更新为: ${value ? '启用' : '禁用'}`);
             } catch (error) {
-                showResult(webhookResult, `错误: ${error.message}`, true);
+                showToast(`错误: ${error.message}`, true);
             }
         }
     }
@@ -175,11 +186,11 @@ document.addEventListener('DOMContentLoaded', function() {
             });
             const result = await response.json();
             if (!response.ok) throw new Error(result.detail || '保存失败');
-            showResult(configResult, "配置保存成功！部分设置可能需要重启服务才能生效。");
+            showToast("配置保存成功！部分设置可能需要重启服务才能生效。");
             // 重新加载以显示新值（特别是密码字段）
             setTimeout(loadConfig, 1000);
         } catch (error) {
-            showResult(configResult, `错误: ${error.message}`, true);
+            showToast(`错误: ${error.message}`, true);
         } finally {
             showLoading(saveConfigBtn, false);
         }
@@ -291,10 +302,22 @@ document.addEventListener('DOMContentLoaded', function() {
         document.querySelectorAll('.delete-rule-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const indexToDelete = parseInt(e.target.dataset.index, 10);
-                if (confirm(`确定要删除规则 "${currentRules[indexToDelete].name}" 吗?`)) {
-                    currentRules.splice(indexToDelete, 1);
-                    renderRules();
-                }
+                Swal.fire({
+                    title: '确定删除吗?',
+                    text: `您确定要删除规则 "${currentRules[indexToDelete].name}" 吗?`,
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#3085d6',
+                    cancelButtonColor: '#d33',
+                    confirmButtonText: '是的，删除它！',
+                    cancelButtonText: '取消'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        currentRules.splice(indexToDelete, 1);
+                        renderRules();
+                        showToast('规则已删除。');
+                    }
+                });
             });
         });
 
@@ -406,9 +429,9 @@ document.addEventListener('DOMContentLoaded', function() {
             });
             const result = await response.json();
             if (!response.ok) throw new Error(result.detail || '保存规则失败');
-            showResult(rulesResult, result.message);
+            showToast(result.message);
         } catch (error) {
-            showResult(rulesResult, `错误: ${error.message}`, true);
+            showToast(`错误: ${error.message}`, true);
         } finally {
             showLoading(saveRulesBtn, false);
         }
@@ -429,12 +452,22 @@ document.addEventListener('DOMContentLoaded', function() {
         const button = isTest ? embyTestBtn : embyWriteBtn;
 
         if (!tmdbId || tags.length === 0) {
-            alert('请输入 TMDB ID 和至少一个标签。');
+            showToast('请输入 TMDB ID 和至少一个标签。', true);
             return;
         }
         
         if (!isTest) {
-            if (!confirm(`确定要以 [${mode === 'merge' ? '合并' : '覆盖'}] 模式，将标签写入到 TMDB ID 为 ${tmdbId} 的项目吗？此操作不可撤销。`)) {
+            const result = await Swal.fire({
+                title: '确定写入吗?',
+                text: `确定要以 [${mode === 'merge' ? '合并' : '覆盖'}] 模式，将标签写入到 TMDB ID 为 ${tmdbId} 的项目吗？此操作不可撤销。`,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#3085d6',
+                cancelButtonColor: '#d33',
+                confirmButtonText: '是的，写入！',
+                cancelButtonText: '取消'
+            });
+            if (!result.isConfirmed) {
                 return;
             }
         }
@@ -456,37 +489,25 @@ document.addEventListener('DOMContentLoaded', function() {
             const result = await response.json();
             if (!response.ok) throw new Error(result.detail || '操作失败');
 
-            let resultHtml = `<h4>操作结果: ${result.action === 'preview' ? '预览' : '写入'} (${result.mode === 'merge' ? '合并模式' : '覆盖模式'})</h4>`;
-            resultHtml += `<p>找到 ${result.found_items_count} 个匹配项目。</p>`;
+            const actionText = result.action === 'preview' ? '预览' : '写入';
+            const modeText = result.mode === 'merge' ? '合并' : '覆盖';
             
-            if (result.updated_items_count > 0) {
-                resultHtml += `<p style="color: green;">成功处理 ${result.updated_items_count} 个项目:</p><ul>`;
-                result.updated_items.forEach(item => {
-                    resultHtml += `<li><strong>${item.name}</strong> (ID: ${item.id})</li>`;
-                    if (isTest) {
-                        resultHtml += `<ul>
-                            <li>原始标签: ${item.original_tags.join(', ') || '<em>无</em>'}</li>
-                            <li>最终标签: ${item.final_tags.join(', ') || '<em>无</em>'}</li>
-                        </ul>`;
-                    }
-                });
-                resultHtml += `</ul>`;
-            }
+            showToast(`操作: ${actionText} (${modeText}模式)`);
+            showToast(`找到 ${result.found_items_count} 个匹配项目。`);
 
-            if (result.failed_items_count > 0) {
-                resultHtml += `<p style="color: red;">处理失败 ${result.failed_items_count} 个项目:</p><ul>`;
-                result.failed_items.forEach(item => {
-                    resultHtml += `<li><strong>${item.name}</strong> (ID: ${item.id})</li>`;
-                });
-                resultHtml += `</ul>`;
+            if (result.updated_items_count > 0) {
+                showToast(`成功处理 ${result.updated_items_count} 个项目。`);
             }
-            
-            embyResult.innerHTML = resultHtml;
-            embyResult.classList.remove('hidden');
+            if (result.failed_items_count > 0) {
+                showToast(`处理失败 ${result.failed_items_count} 个项目。`, true);
+            }
+            if (result.found_items_count > 0 && result.updated_items_count === 0 && result.failed_items_count === 0) {
+                 showToast('项目已找到，但没有标签需要更新。');
+            }
+            embyResult.classList.add('hidden'); // Hide the detailed result area
 
         } catch (error) {
-            embyResult.innerHTML = `<p style="color:red;">错误: ${error.message}</p>`;
-            embyResult.classList.remove('hidden');
+            showToast(`错误: ${error.message}`, true);
         } finally {
             showLoading(button, false);
         }
@@ -500,7 +521,18 @@ document.addEventListener('DOMContentLoaded', function() {
     const clearAllTagsResult = document.getElementById('clear-all-tags-result');
 
     clearAllTagsBtn.addEventListener('click', async () => {
-        if (!confirm("您确定要清除 Emby 媒体库中所有电影和剧集的标签吗？此操作不可撤销！")) {
+        const result = await Swal.fire({
+            title: '危险操作！',
+            text: "您确定要清除 Emby 媒体库中所有电影和剧集的标签吗？此操作不可撤销！",
+            icon: 'error',
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            cancelButtonColor: '#3085d6',
+            confirmButtonText: '是的，全部清除！',
+            cancelButtonText: '取消'
+        });
+
+        if (!result.isConfirmed) {
             return;
         }
 
@@ -514,14 +546,13 @@ document.addEventListener('DOMContentLoaded', function() {
             const result = await response.json();
             if (!response.ok) throw new Error(result.detail || '清除失败');
 
-            showResult(clearAllTagsResult, `
-                <h4>清除结果:</h4>
-                <p style="color: green;">${result.message}</p>
-                <p>成功清除: ${result.cleared_count} 个项目</p>
-                <p>清除失败: ${result.failed_count} 个项目</p>
-            `);
+            showToast(result.message);
+            showToast(`成功清除: ${result.cleared_count} 个项目`);
+            if (result.failed_count > 0) {
+                showToast(`清除失败: ${result.failed_count} 个项目`, true);
+            }
         } catch (error) {
-            showResult(clearAllTagsResult, `错误: ${error.message}`, true);
+            showToast(`错误: ${error.message}`, true);
         } finally {
             showLoading(clearAllTagsBtn, false);
         }
@@ -543,35 +574,26 @@ document.addEventListener('DOMContentLoaded', function() {
             const result = await response.json();
 
             if (!response.ok) {
-                showResult(tagAllMediaResult, `错误: 无法获取任务状态 - ${result.detail || '未知错误'}`, true);
+                showToast(`错误: 无法获取任务状态 - ${result.detail || '未知错误'}`, true);
                 clearInterval(tagAllMediaPollingInterval);
                 showLoading(tagAllMediaBtn, false);
                 return;
             }
 
-            let statusMessage = `
-                <h4>任务状态: ${result.status}</h4>
-                <p>模式: ${result.mode === 'merge' ? '合并' : '覆盖'}</p>
-                <p>已处理项目: ${result.processed_count}</p>
-                <p>已更新项目: ${result.updated_count}</p>
-                <p>失败项目: ${result.failed_count}</p>
-            `;
-
             if (result.status === 'completed') {
-                statusMessage += `<p style="color: green; font-weight: bold;">打标签任务已完成！</p>`;
+                showToast('一键打标签任务已完成！');
+                showToast(`已更新 ${result.updated_count} 个项目, 失败 ${result.failed_count} 个。`);
                 clearInterval(tagAllMediaPollingInterval);
                 showLoading(tagAllMediaBtn, false);
+                tagAllMediaResult.classList.add('hidden');
             } else if (result.status === 'failed') {
-                statusMessage += `<p style="color: red; font-weight: bold;">打标签任务失败: ${result.error || '未知错误'}</p>`;
+                showToast(`一键打标签任务失败: ${result.error || '未知错误'}`, true);
                 clearInterval(tagAllMediaPollingInterval);
                 showLoading(tagAllMediaBtn, false);
-            } else {
-                statusMessage += `<p>任务正在进行中...</p>`;
+                tagAllMediaResult.classList.add('hidden');
             }
-            showResult(tagAllMediaResult, statusMessage);
-
         } catch (error) {
-            showResult(tagAllMediaResult, `错误: 轮询任务状态失败 - ${error.message}`, true);
+            showToast(`错误: 轮询任务状态失败 - ${error.message}`, true);
             clearInterval(tagAllMediaPollingInterval);
             showLoading(tagAllMediaBtn, false);
         }
@@ -579,7 +601,19 @@ document.addEventListener('DOMContentLoaded', function() {
 
     tagAllMediaBtn.addEventListener('click', async () => {
         const mode = document.querySelector('input[name="tag-all-media-mode"]:checked').value;
-        if (!confirm(`您确定要以 [${mode === 'merge' ? '合并' : '覆盖'}] 模式，对所有 Emby 媒体库中的电影和剧集进行打标签操作吗？此操作将在后台执行，并在页面上显示进度。`)) {
+        
+        const result = await Swal.fire({
+            title: '确认一键打标签?',
+            text: `您确定要以 [${mode === 'merge' ? '合并' : '覆盖'}] 模式，对所有 Emby 媒体库中的电影和剧集进行打标签操作吗？此操作将在后台执行，并在页面上显示进度。`,
+            icon: 'info',
+            showCancelButton: true,
+            confirmButtonColor: '#3085d6',
+            cancelButtonColor: '#d33',
+            confirmButtonText: '是的，开始！',
+            cancelButtonText: '取消'
+        });
+
+        if (!result.isConfirmed) {
             return;
         }
 
@@ -601,11 +635,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (!response.ok) throw new Error(result.detail || '启动任务失败');
 
             currentTagAllMediaTaskId = result.task_id;
-            showResult(tagAllMediaResult, `
-                <h4>任务启动成功:</h4>
-                <p style="color: green;">打标签任务已在后台启动，任务ID: <code>${currentTagAllMediaTaskId}</code></p>
-                <p>正在获取任务进度...</p>
-            `);
+            showToast(`打标签任务已在后台启动 (ID: ${currentTagAllMediaTaskId})`);
 
             // 启动轮询
             tagAllMediaPollingInterval = setInterval(() => pollTagAllMediaStatus(currentTagAllMediaTaskId), 3000); // 每3秒轮询一次
@@ -703,9 +733,18 @@ document.addEventListener('DOMContentLoaded', function() {
             embyFormContainer.style.border = '2px solid #3498db';
             setTimeout(() => { embyFormContainer.style.border = 'none'; }, 2000);
 
-            if (confirm(`将使用自动生成的标签对 TMDB ID ${tmdbId} 进行 [${mode}] 操作，是否继续？`)) {
-                handleEmbyWrite(false); // false for actual write
-            }
+            Swal.fire({
+                title: '确认写入?',
+                text: `将使用自动生成的标签对 TMDB ID ${tmdbId} 进行 [${mode}] 操作，是否继续？`,
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonText: '继续',
+                cancelButtonText: '取消'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    handleEmbyWrite(false); // false for actual write
+                }
+            });
         }
     });
 

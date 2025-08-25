@@ -2,7 +2,7 @@
   "rules": [
     {
       "name": "热门日韩剧",
-      "tag": "日本电视剧",
+      "tag": "日本电视剧13",
       "conditions": {
         "countries": [
           "KR",
