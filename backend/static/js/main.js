@@ -635,6 +635,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const tagAllMediaBtn = document.getElementById('tag-all-media-btn');
     const tagAllMediaResult = document.getElementById('tag-all-media-result');
     const tagAllMediaModeRadios = document.querySelectorAll('input[name="tag-all-media-mode"]');
+    const tagAllMediaLibraryTypeRadios = document.querySelectorAll('input[name="tag-all-media-library-type"]');
 
     let currentTagAllMediaTaskId = null;
     let tagAllMediaPollingInterval = null;
@@ -655,7 +656,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             if (result.status === 'completed') {
                 showToast('一键打标签任务已完成！');
-                showToast(`已更新 ${result.updated_count} 个项目, 失败 ${result.failed_count} 个。`);
+                showToast(`库类型: ${result.library_type === 'all' ? '全库' : '最爱/收藏'}，已更新 ${result.updated_count} 个项目, 失败 ${result.failed_count} 个。`);
                 clearInterval(tagAllMediaPollingInterval);
                 showLoading(tagAllMediaBtn, false);
                 tagAllMediaResult.classList.add('hidden');
@@ -674,10 +675,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
     tagAllMediaBtn.addEventListener('click', async () => {
         const mode = document.querySelector('input[name="tag-all-media-mode"]:checked').value;
+        const libraryType = document.querySelector('input[name="tag-all-media-library-type"]:checked').value;
         
         const result = await Swal.fire({
             title: '确认一键打标签?',
-            text: `您确定要以 [${mode === 'merge' ? '合并' : '覆盖'}] 模式，对所有 Emby 媒体库中的电影和剧集进行打标签操作吗？此操作将在后台执行，并在页面上显示进度。`,
+            text: `您确定要以 [${mode === 'merge' ? '合并' : '覆盖'}] 模式，对 Emby 媒体库中的 [${libraryType === 'all' ? '全库' : '最爱/收藏'}] 电影和剧集进行打标签操作吗？此操作将在后台执行，并在页面上显示进度。`,
             icon: 'info',
             showCancelButton: true,
             confirmButtonColor: '#3085d6',
@@ -702,7 +704,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const response = await fetch(`${apiPrefix}/tag_all_media`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ mode: mode })
+                body: JSON.stringify({ mode: mode, library_type: libraryType })
             });
             const result = await response.json();
             if (!response.ok) throw new Error(result.detail || '启动任务失败');

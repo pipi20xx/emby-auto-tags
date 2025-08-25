@@ -42,6 +42,9 @@
     - 任务在后台异步执行，前端页面通过轮询API实时显示任务进度（已处理、已更新、失败数量）。
   - **改进**: 优化了后台任务的日志记录，将 `print` 语句替换为 `logging` 模块。
   - **修复**: 修复了 `AttributeError: module 'services.config_service' has no attribute 'get_current_time'` 错误。
+    - **v1.0.10 (2025-08-25)**
+      - **修复**: 修复了 `tag_all_media_items()` 函数中 `library_type` 参数无效的问题，并支持对“最爱”媒体库进行打标签操作。
+        - 删除了 `backend/services/emby_service.py` 中重复的 `tag_all_media_items` 函数定义，确保 `library_type` 参数能够正确传递和使用，从而支持对全库和最爱媒体进行打标签。
     - **v1.0.9 (2025-08-25)**
       - **新增功能**: 添加了“清除 Emby 媒体库中的指定标签”功能。
         - 在 Web 管理面板中新增了“清除 Emby 媒体库中的指定标签”区域，允许用户输入一个或多个标签，并从所有电影和剧集中移除这些标签。

@@ -9,14 +9,19 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-async def _run_tag_all_media_task(task_id: str, mode: Literal['merge', 'overwrite'], task_manager: Dict[str, Any]):
+async def _run_tag_all_media_task(
+    task_id: str,
+    mode: Literal['merge', 'overwrite'],
+    library_type: Literal['all', 'favorite'],
+    task_manager: Dict[str, Any]
+):
     """
     实际执行打标签任务的后台函数。
     """
     try:
         task_manager[task_id]["status"] = "running"
-        logger.info(f"任务 {task_id}: 开始对所有媒体进行打标签操作 (模式: {mode})...")
-        result = await emby_service.tag_all_media_items(mode=mode)
+        logger.info(f"任务 {task_id}: 开始对媒体进行打标签操作 (模式: {mode}, 库类型: {library_type})...")
+        result = await emby_service.tag_all_media_items(mode=mode, library_type=library_type)
         task_manager[task_id].update(result)
         task_manager[task_id]["status"] = "completed"
         logger.info(f"任务 {task_id}: 打标签任务完成。结果: {result}")
@@ -29,10 +34,11 @@ async def _run_tag_all_media_task(task_id: str, mode: Literal['merge', 'overwrit
 async def tag_all_media(
     request: Request,
     background_tasks: BackgroundTasks,
-    mode: Literal['merge', 'overwrite'] = Body('merge', embed=True)
+    mode: Literal['merge', 'overwrite'] = Body('merge', embed=True),
+    library_type: Literal['all', 'favorite'] = Body('all', embed=True)
 ):
     """
-    触发对所有 Emby 媒体库中的电影和剧集进行打标签操作。
+    触发对 Emby 媒体库中的电影和剧集进行打标签操作。
     操作将在后台执行。
     """
     task_id = str(uuid.uuid4())
@@ -41,14 +47,15 @@ async def tag_all_media(
         "task_id": task_id,
         "status": "pending",
         "mode": mode,
+        "library_type": library_type,
         "processed_count": 0,
         "updated_count": 0,
         "failed_count": 0,
         "start_time": core_config.get_current_time()
     }
     
-    logger.info(f"收到请求：启动后台打标签任务 {task_id} (模式: {mode})...")
-    background_tasks.add_task(_run_tag_all_media_task, task_id, mode, task_manager)
+    logger.info(f"收到请求：启动后台打标签任务 {task_id} (模式: {mode}, 库类型: {library_type})...")
+    background_tasks.add_task(_run_tag_all_media_task, task_id, mode, library_type, task_manager)
     return {"message": "打标签任务已在后台启动。", "task_id": task_id}
 
 @router.get("/tag_all_media/status/{task_id}", tags=["Tasks"])

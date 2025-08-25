@@ -2,6 +2,9 @@ import requests
 import json
 from typing import List, Optional, Literal
 from core import config
+import logging
+
+logger = logging.getLogger(__name__)
 
 def _get_headers():
     """构造 Emby API 请求头"""
@@ -206,6 +209,55 @@ def get_all_emby_items(item_type: str = "Movie,Series") -> List[dict]:
             return []
     return all_items
 
+def get_favorite_emby_items(item_type: str = "Movie,Series") -> List[dict]:
+    """
+    获取 Emby 中所有指定类型的收藏媒体项目。
+    :param item_type: Emby 的媒体类型, 例如 "Movie", "Series", 或 "Movie,Series"
+    """
+    if not config.EMBY_SERVER_URL:
+        logger.error("错误: EMBY_SERVER_URL 未配置")
+        return []
+
+    user_id = _get_user_id()
+    if not user_id:
+        logger.error("错误: 无法获取 Emby UserID，无法继续查找收藏项目。")
+        return []
+
+    url = f"{config.EMBY_SERVER_URL}/emby/Users/{user_id}/Items"
+    params = {
+        'Recursive': 'true',
+        'IncludeItemTypes': item_type,
+        'Fields': 'ProviderIds,Tags,TagItems,LockedFields',
+        'IsFavorite': 'true', # 关键参数：只获取收藏项目
+        'Limit': 100,
+        'api_key': config.EMBY_API_KEY
+    }
+    
+    all_items = []
+    start_index = 0
+
+    while True:
+        current_params = params.copy()
+        current_params['StartIndex'] = start_index
+        try:
+            logger.info(f"正在获取 Emby 收藏项目: StartIndex={start_index}, Limit={params['Limit']}")
+            response = requests.get(url, headers=_get_headers(), params=current_params)
+            response.raise_for_status()
+            data = response.json()
+            items = data.get('Items', [])
+            all_items.extend(items)
+            
+            total_count = data.get('TotalRecordCount', 0)
+            logger.info(f"当前获取到 {len(items)} 个收藏项目，总记录数: {total_count}，已获取总数: {len(all_items)}")
+
+            if not items or len(all_items) >= total_count:
+                break
+            start_index += params['Limit']
+        except requests.exceptions.RequestException as e:
+            logger.error(f"获取所有 Emby 收藏项目时出错: {e}")
+            return []
+    return all_items
+
 def clear_all_item_tags() -> dict:
     """
     清除 Emby 媒体库中所有电影和剧集的标签。
@@ -281,6 +333,75 @@ def clear_specific_item_tags(tags_to_remove: List[str]) -> dict:
         "processed_count": processed_count,
         "removed_from_count": removed_from_count,
         "failed_count": failed_count
+    }
+
+async def tag_all_media_items(
+    mode: Literal['merge', 'overwrite'] = 'merge',
+    library_type: Literal['all', 'favorite'] = 'all'
+) -> dict:
+    """
+    遍历所有 Emby 媒体库中的电影和剧集，根据规则进行打标签。
+    处理多版本电影只打一个标签，多版本电视剧全部打标签的逻辑。
+    :param mode: 'merge' (合并) 或 'overwrite' (覆盖)
+    :param library_type: 'all' (全库) 或 'favorite' (最爱/收藏)
+    """
+    from services import tmdb_service, rule_service # 避免循环引用
+    from collections import defaultdict
+
+    logger.info(f"开始对 Emby 媒体项目进行打标签操作 (模式: {mode}, 库类型: {library_type})...")
+    
+    all_items = []
+    if library_type == 'all':
+        all_items = get_all_emby_items()
+        logger.info(f"从 Emby API 获取到 {len(all_items)} 个全库媒体项目。")
+    elif library_type == 'favorite':
+        all_items = get_favorite_emby_items()
+        logger.info(f"从 Emby API 获取到 {len(all_items)} 个收藏媒体项目。")
+
+    processed_count = 0
+    updated_count = 0
+    failed_count = 0
+
+    # 按 TMDB ID 和 ItemType 分组项目
+    grouped_items: Dict[str, Dict[str, List[dict]]] = defaultdict(lambda: defaultdict(list))
+    for item in all_items:
+        tmdb_id = item.get('ProviderIds', {}).get('Tmdb')
+        item_type = item.get('Type') # "Movie" or "Series"
+        if tmdb_id and item_type:
+            grouped_items[tmdb_id][item_type].append(item)
+    
+    # 新增日志：打印分组后的项目数量
+    for tmdb_id, types_map in grouped_items.items():
+        for item_type, items_list in types_map.items():
+            logger.info(f"TMDB ID: {tmdb_id}, 类型: {item_type}, 包含 {len(items_list)} 个 Emby 项目。")
+
+    for tmdb_id, types_map in grouped_items.items():
+        for item_type, items_list in types_map.items():
+            if item_type == 'Movie' or item_type == 'Series':
+                # 对于电影和电视剧，处理所有项目
+                for item in items_list:
+                    processed_count += 1
+                    if await _process_single_item_for_tagging(item, mode, logger, tmdb_service, rule_service):
+                        updated_count += 1
+                    else:
+                        failed_count += 1
+            else:
+                # 对于其他未知类型，也处理所有项目（或者根据需求决定跳过）
+                for item in items_list:
+                    processed_count += 1
+                    if await _process_single_item_for_tagging(item, mode, logger, tmdb_service, rule_service):
+                        updated_count += 1
+                    else:
+                        failed_count += 1
+
+    logger.info(f"所有媒体项目打标签完成。总处理 {processed_count} 个，成功更新 {updated_count} 个，失败 {failed_count} 个。")
+    return {
+        "status": "completed",
+        "processed_count": processed_count,
+        "updated_count": updated_count,
+        "failed_count": failed_count,
+        "mode": mode,
+        "library_type": library_type
     }
 
 async def _process_single_item_for_tagging(
@@ -368,65 +489,6 @@ async def _process_single_item_for_tagging(
         return False
 
 
-async def tag_all_media_items(mode: Literal['merge', 'overwrite'] = 'merge') -> dict:
-    """
-    遍历所有 Emby 媒体库中的电影和剧集，根据规则进行打标签。
-    处理多版本电影只打一个标签，多版本电视剧全部打标签的逻辑。
-    """
-    from services import tmdb_service, rule_service # 避免循环引用
-    import logging
-    from collections import defaultdict
-
-    logger = logging.getLogger(__name__)
-
-    logger.info(f"开始对所有 Emby 媒体项目进行打标签操作 (模式: {mode})...")
-    all_items = get_all_emby_items()
-    logger.info(f"从 Emby API 获取到 {len(all_items)} 个媒体项目。") # 新增日志
-
-    processed_count = 0
-    updated_count = 0
-    failed_count = 0
-
-    # 按 TMDB ID 和 ItemType 分组项目
-    grouped_items: Dict[str, Dict[str, List[dict]]] = defaultdict(lambda: defaultdict(list))
-    for item in all_items:
-        tmdb_id = item.get('ProviderIds', {}).get('Tmdb')
-        item_type = item.get('Type') # "Movie" or "Series"
-        if tmdb_id and item_type:
-            grouped_items[tmdb_id][item_type].append(item)
-    
-    # 新增日志：打印分组后的项目数量
-    for tmdb_id, types_map in grouped_items.items():
-        for item_type, items_list in types_map.items():
-            logger.info(f"TMDB ID: {tmdb_id}, 类型: {item_type}, 包含 {len(items_list)} 个 Emby 项目。")
-
-    for tmdb_id, types_map in grouped_items.items():
-        for item_type, items_list in types_map.items():
-            if item_type == 'Movie' or item_type == 'Series':
-                # 对于电影和电视剧，处理所有项目
-                for item in items_list:
-                    processed_count += 1
-                    if await _process_single_item_for_tagging(item, mode, logger, tmdb_service, rule_service):
-                        updated_count += 1
-                    else:
-                        failed_count += 1
-            else:
-                # 对于其他未知类型，也处理所有项目（或者根据需求决定跳过）
-                for item in items_list:
-                    processed_count += 1
-                    if await _process_single_item_for_tagging(item, mode, logger, tmdb_service, rule_service):
-                        updated_count += 1
-                    else:
-                        failed_count += 1
-
-    logger.info(f"所有媒体项目打标签完成。总处理 {processed_count} 个，成功更新 {updated_count} 个，失败 {failed_count} 个。")
-    return {
-        "status": "completed",
-        "processed_count": processed_count,
-        "updated_count": updated_count,
-        "failed_count": failed_count,
-        "mode": mode
-    }
 
 # 为了向后兼容旧的测试路由，保留此函数，但让它调用新的核心函数
 def update_item_tags(item_id: str, new_tags: List[str]):
