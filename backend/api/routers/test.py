@@ -22,6 +22,29 @@ async def clear_all_emby_tags():
     else:
         raise HTTPException(status_code=500, detail="清除所有标签时发生错误。")
 
+class ClearSpecificTagsRequest(BaseModel):
+    tags: List[str]
+
+@router.post("/clear-specific-tags")
+async def clear_specific_emby_tags(request: ClearSpecificTagsRequest = Body(...)):
+    """
+    从 Emby 媒体库中所有电影和剧集中移除指定的标签。
+    """
+    if not request.tags:
+        raise HTTPException(status_code=400, detail="请提供至少一个要清除的标签。")
+
+    result = emby_service.clear_specific_item_tags(request.tags)
+    if result["success"]:
+        return {
+            "status": "success",
+            "message": f"成功从 {result['removed_from_count']} 个项目中移除标签，总处理 {result['processed_count']} 个项目，{result['failed_count']} 个项目处理失败。",
+            "processed_count": result['processed_count'],
+            "removed_from_count": result['removed_from_count'],
+            "failed_count": result['failed_count']
+        }
+    else:
+        raise HTTPException(status_code=500, detail="清除指定标签时发生错误。")
+
 @router.post("/tmdb")
 async def test_tmdb_fetch(tmdb_id: str = Body(..., embed=True), media_type: str = Body(..., embed=True)):
     """测试 TMDB 信息获取并返回提取后的关键信息"""

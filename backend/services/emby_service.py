@@ -230,6 +230,54 @@ def clear_all_item_tags() -> dict:
         "failed_count": failed_count
     }
 
+def clear_specific_item_tags(tags_to_remove: List[str]) -> dict:
+    """
+    从 Emby 媒体库中所有电影和剧集中移除指定的标签。
+    """
+    print(f"开始从所有 Emby 媒体项目中移除指定标签: {tags_to_remove}...")
+    all_items = get_all_emby_items()
+    
+    processed_count = 0
+    removed_from_count = 0
+    failed_count = 0
+    
+    for item in all_items:
+        item_id = item.get('Id')
+        item_name = item.get('Name')
+        if not item_id:
+            print(f"警告: 发现一个没有 ID 的项目: {item}")
+            continue
+
+        processed_count += 1
+        print(f"正在处理项目 '{item_name}' (ID: {item_id})...")
+
+        original_tags = []
+        if "Tags" in item and item["Tags"]:
+            original_tags = item["Tags"]
+        elif "TagItems" in item:
+            original_tags = [t.get('Name') for t in item["TagItems"] if t.get('Name')]
+        
+        # 计算新的标签列表：移除所有 tags_to_remove 中的标签
+        new_tags = [tag for tag in original_tags if tag not in tags_to_remove]
+
+        # 如果标签列表有变化，才进行更新
+        if sorted(new_tags) != sorted(original_tags):
+            print(f"项目 '{item_name}' (ID: {item_id}) 的标签将从 {original_tags} 更新为 {new_tags}")
+            if update_item_metadata(item_id, new_tags, mode='overwrite'):
+                removed_from_count += 1
+            else:
+                failed_count += 1
+        else:
+            print(f"项目 '{item_name}' (ID: {item_id}) 不包含任何要移除的标签，跳过更新。")
+
+    print(f"指定标签移除完成。总处理 {processed_count} 个项目，成功从 {removed_from_count} 个项目中移除标签，{failed_count} 个项目处理失败。")
+    return {
+        "success": True,
+        "processed_count": processed_count,
+        "removed_from_count": removed_from_count,
+        "failed_count": failed_count
+    }
+
 async def tag_all_media_items(mode: Literal['merge', 'overwrite'] = 'merge') -> dict:
     """
     遍历所有 Emby 媒体库中的电影和剧集，根据规则进行打标签。

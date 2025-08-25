@@ -1,26 +1,8 @@
 {
   "rules": [
     {
-      "name": "只有动画",
-      "tag": "只有动画",
-      "conditions": {
-        "countries": [
-          "US"
-        ],
-        "genre_ids": [
-          16,
-          10759,
-          10765,
-          35
-        ],
-        "years": []
-      },
-      "item_type": "series",
-      "match_all_conditions": true
-    },
-    {
-      "name": "不严格只有动画",
-      "tag": "不严格只有动画",
+      "name": "qwdwqd",
+      "tag": "123",
       "conditions": {
         "countries": [],
         "genre_ids": [
@@ -28,7 +10,20 @@
         ],
         "years": []
       },
-      "item_type": "movie",
+      "item_type": "all",
+      "match_all_conditions": false
+    },
+    {
+      "name": "12313",
+      "tag": "456",
+      "conditions": {
+        "countries": [],
+        "genre_ids": [
+          16
+        ],
+        "years": []
+      },
+      "item_type": "all",
       "match_all_conditions": false
     }
   ]

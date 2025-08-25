@@ -579,6 +579,58 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
+    // --- 清除指定标签功能 ---
+    const clearSpecificTagsBtn = document.getElementById('clear-specific-tags-btn');
+    const tagsToClearInput = document.getElementById('tags-to-clear');
+    const clearSpecificTagsResult = document.getElementById('clear-specific-tags-result');
+
+    clearSpecificTagsBtn.addEventListener('click', async () => {
+        const tagsToClear = tagsToClearInput.value.split(',').map(tag => tag.trim()).filter(Boolean);
+
+        if (tagsToClear.length === 0) {
+            showToast('请输入至少一个要清除的标签。', true);
+            return;
+        }
+
+        const result = await Swal.fire({
+            title: '危险操作！',
+            text: `您确定要从 Emby 媒体库中所有电影和剧集中移除以下标签吗？\n\n${tagsToClear.join(', ')}\n\n此操作不可撤销！`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#f39c12',
+            cancelButtonColor: '#3085d6',
+            confirmButtonText: '是的，清除这些标签！',
+            cancelButtonText: '取消'
+        });
+
+        if (!result.isConfirmed) {
+            return;
+        }
+
+        showLoading(clearSpecificTagsBtn);
+        clearSpecificTagsResult.classList.add('hidden');
+        try {
+            const response = await fetch(`${apiPrefix}/test/clear-specific-tags`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ tags: tagsToClear })
+            });
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.detail || '清除失败');
+
+            showToast(result.message);
+            showToast(`成功处理: ${result.processed_count} 个项目`);
+            showToast(`成功移除标签: ${result.removed_from_count} 个项目`);
+            if (result.failed_count > 0) {
+                showToast(`处理失败: ${result.failed_count} 个项目`, true);
+            }
+        } catch (error) {
+            showToast(`错误: ${error.message}`, true);
+        } finally {
+            showLoading(clearSpecificTagsBtn, false);
+        }
+    });
+
     // --- 一键打标签功能 ---
     const tagAllMediaBtn = document.getElementById('tag-all-media-btn');
     const tagAllMediaResult = document.getElementById('tag-all-media-result');

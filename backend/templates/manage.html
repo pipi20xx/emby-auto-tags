@@ -136,6 +136,16 @@
         <div id="clear-all-tags-result" class="result hidden"></div>
     </div>
 
+    <!-- 清除指定标签 -->
+    <div class="container">
+        <h2>清除 Emby 媒体库中的指定标签</h2>
+        <p style="color: orange; font-weight: bold;">警告: 此操作将从 Emby 媒体库中所有电影和剧集中移除指定的标签，不可撤销！</p>
+        <label for="tags-to-clear">要清除的标签 (英文逗号分隔):</label>
+        <input type="text" id="tags-to-clear" placeholder="例如: 标签1,标签2">
+        <button type="button" id="clear-specific-tags-btn" style="background-color: #f39c12;">确认清除指定标签</button>
+        <div id="clear-specific-tags-result" class="result hidden"></div>
+    </div>
+
     <!-- 一键打标签 -->
     <div class="container">
         <h2>一键为所有媒体打标签</h2>
