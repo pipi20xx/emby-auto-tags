@@ -5,16 +5,17 @@
       "tag": "只有动画",
       "conditions": {
         "countries": [
-          "JP"
+          "US"
         ],
         "genre_ids": [
           16,
-          18,
-          35,
-          9648
-        ]
+          10759,
+          10765,
+          35
+        ],
+        "years": []
       },
-      "item_type": "movie",
+      "item_type": "series",
       "match_all_conditions": true
     },
     {
@@ -24,7 +25,8 @@
         "countries": [],
         "genre_ids": [
           16
-        ]
+        ],
+        "years": []
       },
       "item_type": "movie",
       "match_all_conditions": false

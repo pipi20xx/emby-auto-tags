@@ -277,6 +277,7 @@ document.addEventListener('DOMContentLoaded', function() {
         currentRules.forEach((rule, index) => {
             const countryNames = (rule.conditions.countries || []).map(code => dataMaps.countries[code] || code).join(', ');
             const genreNames = (rule.conditions.genre_ids || []).map(id => dataMaps.genres[id] || id).join(', ');
+            const yearsDisplay = (rule.conditions.years || []).join(', ') || '全部';
 
             const itemTypeDisplay = {
                 "movie": "电影",
@@ -290,6 +291,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 <td>${rule.tag || ''}</td>
                 <td>${countryNames}</td>
                 <td>${genreNames}</td>
+                <td>${yearsDisplay}</td>
                 <td>${itemTypeDisplay}</td>
                 <td class="actions-cell">
                     <button class="edit-rule-btn" data-index="${index}">编辑</button>
@@ -344,6 +346,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 const checkbox = ruleForm.querySelector(`input[name="countries"][value="${code}"]`);
                 if (checkbox) checkbox.checked = true;
             });
+
+            // Set years
+            document.getElementById('rule-years').value = (rule.conditions.years || []).join(', ');
 
             // Check selected genres
             (rule.conditions.genre_ids || []).forEach(id => {
@@ -410,10 +415,16 @@ document.addEventListener('DOMContentLoaded', function() {
         const itemType = document.getElementById('rule-item-type').value;
         const matchAllConditions = document.getElementById('rule-match-all-conditions').checked;
 
+        const selectedYears = document.getElementById('rule-years').value
+                                .split(/[, ]+/) // Split by comma or space
+                                .filter(Boolean) // Remove empty strings
+                                .map(year => parseInt(year.trim(), 10))
+                                .filter(year => !isNaN(year)); // Ensure it's a valid number
+
         const newRule = { 
             name, 
             tag, 
-            conditions: { countries: selectedCountries, genre_ids: selectedGenreIds }, 
+            conditions: { countries: selectedCountries, genre_ids: selectedGenreIds, years: selectedYears }, 
             item_type: itemType,
             match_all_conditions: matchAllConditions
         };

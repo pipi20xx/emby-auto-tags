@@ -152,8 +152,19 @@ async def test_full_flow_preview(request: FullFlowRequest = Body(...)):
             if mapped_country:
                 countries = [mapped_country]
 
+    # 提取年份信息 (与 emby_service.py 保持一致)
+    media_year = None
+    if request.media_type == 'movie':
+        release_date = details.get('release_date')
+        if release_date and len(release_date) >= 4:
+            media_year = int(release_date[:4])
+    elif request.media_type == 'tv':
+        first_air_date = details.get('first_air_date')
+        if first_air_date and len(first_air_date) >= 4:
+            media_year = int(first_air_date[:4])
+
     # 3. 根据规则生成标签
-    generated_tags = rule_service.generate_tags(countries, genre_ids, request.media_type)
+    generated_tags = rule_service.generate_tags(countries, genre_ids, media_year, request.media_type)
 
     # 4. 查找 Emby 项目以提供更丰富的预览信息
     emby_items = emby_service.find_emby_items_by_tmdb_id(request.tmdb_id, item_type=media_type_emby)

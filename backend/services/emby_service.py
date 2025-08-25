@@ -285,57 +285,53 @@ async def tag_all_media_items(mode: Literal['merge', 'overwrite'] = 'merge') -> 
                 elif isinstance(origin_country, str):
                     countries = [origin_country]
             
+            # 如果以上都无法提供国家，则 countries 保持为空
+                
             if not countries:
                 original_language = details.get('original_language')
                 if original_language:
-                    # 简单的语言到国家映射，作为备用方案
+                    # 简单的语言到国家映射，可能不完全准确，但符合用户要求
                     lang_to_country_map = {
-                        "en": "US", "zh": "CN", "ja": "JP", "ko": "KR",
-                        "fr": "FR", "de": "DE", "es": "ES", "it": "IT",
-                        "hi": "IN", "ar": "SA", "pt": "BR", "ru": "RU",
-                        "th": "TH", "sv": "SE", "da": "DK", "no": "NO",
-                        "nl": "NL", "pl": "PL",
+                        "en": "US", # 英语通常指美国
+                        "zh": "CN", # 中文
+                        "ja": "JP", # 日语
+                        "ko": "KR", # 韩语
+                        "fr": "FR", # 法语
+                        "de": "DE", # 德语
+                        "es": "ES", # 西班牙语
+                        "it": "IT", # 意大利语
+                        "hi": "IN", # 印地语
+                        "ar": "SA", # 阿拉伯语
+                        "pt": "BR", # 葡萄牙语
+                        "ru": "RU", # 俄语
+                        "th": "TH", # 泰语
+                        "sv": "SE", # 瑞典语
+                        "da": "DK", # 丹麦语
+                        "no": "NO", # 挪威语
+                        "nl": "NL", # 荷兰语
+                        "pl": "PL", # 波兰语
+                        # 可以根据需要添加更多映射
                     }
                     mapped_country = lang_to_country_map.get(original_language)
                     if mapped_country:
                         countries = [mapped_country]
             
-            # 如果以上都无法提供国家，则 countries 保持为空
-                
-                if not countries:
-                    original_language = details.get('original_language')
-                    if original_language:
-                        # 简单的语言到国家映射，可能不完全准确，但符合用户要求
-                        lang_to_country_map = {
-                            "en": "US", # 英语通常指美国
-                            "zh": "CN", # 中文
-                            "ja": "JP", # 日语
-                            "ko": "KR", # 韩语
-                            "fr": "FR", # 法语
-                            "de": "DE", # 德语
-                            "es": "ES", # 西班牙语
-                            "it": "IT", # 意大利语
-                            "hi": "IN", # 印地语
-                            "ar": "SA", # 阿拉伯语
-                            "pt": "BR", # 葡萄牙语
-                            "ru": "RU", # 俄语
-                            "th": "TH", # 泰语
-                            "sv": "SE", # 瑞典语
-                            "da": "DK", # 丹麦语
-                            "no": "NO", # 挪威语
-                            "nl": "NL", # 荷兰语
-                            "pl": "PL", # 波兰语
-                            # 可以根据需要添加更多映射
-                        }
-                        mapped_country = lang_to_country_map.get(original_language)
-                        if mapped_country:
-                            countries = [mapped_country]
-                
-                # 如果 origin_country 和 original_language 都无法提供国家，则 countries 保持为空
+            # 如果 origin_country 和 original_language 都无法提供国家，则 countries 保持为空
+            
+            # 提取年份信息
+            media_year = None
+            if media_type_tmdb == 'movie':
+                release_date = details.get('release_date')
+                if release_date and len(release_date) >= 4:
+                    media_year = int(release_date[:4])
+            elif media_type_tmdb == 'tv':
+                first_air_date = details.get('first_air_date')
+                if first_air_date and len(first_air_date) >= 4:
+                    media_year = int(first_air_date[:4])
             
             # 将 Emby 的 ItemType 转换为后端规则使用的 item_type ("movie" 或 "series")
             rule_item_type = 'movie' if item_type == 'Movie' else 'series' if item_type == 'Series' else 'all'
-            generated_tags = rule_service.generate_tags(countries, genre_ids, rule_item_type)
+            generated_tags = rule_service.generate_tags(countries, genre_ids, media_year, rule_item_type)
 
             if not generated_tags:
                 logger.info(f"项目 '{item_name}' 未生成任何标签，跳过更新。")
