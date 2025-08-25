@@ -278,12 +278,99 @@ def clear_specific_item_tags(tags_to_remove: List[str]) -> dict:
         "failed_count": failed_count
     }
 
+async def _process_single_item_for_tagging(
+    item: dict,
+    mode: Literal['merge', 'overwrite'],
+    logger,
+    tmdb_service,
+    rule_service
+) -> bool:
+    """
+    处理单个 Emby 项目的标签生成和更新逻辑。
+    返回 True 表示成功更新，False 表示失败或跳过。
+    """
+    item_id = item.get('Id')
+    item_name = item.get('Name')
+    item_type = item.get('Type') # "Movie" or "Series"
+    tmdb_id = item.get('ProviderIds', {}).get('Tmdb')
+
+    if not all([item_id, item_name, item_type, tmdb_id]):
+        logger.warning(f"跳过项目 '{item_name}' (ID: {item_id})，缺少关键信息。")
+        return False
+
+    logger.info(f"正在处理项目 '{item_name}' (ID: {item_id}, TMDB ID: {tmdb_id}, 类型: {item_type})...")
+
+    try:
+        # 1. 从 TMDB 获取详细信息
+        media_type_tmdb = 'movie' if item_type == 'Movie' else 'tv' if item_type == 'Series' else None
+        if not media_type_tmdb:
+            logger.warning(f"不支持的媒体类型: {item_type}，跳过处理。")
+            return False
+
+        details = tmdb_service.get_tmdb_details(tmdb_id, media_type_tmdb)
+        if not details:
+            logger.warning(f"无法从 TMDB 获取项目 '{item_name}' (TMDB ID: {tmdb_id}) 的信息，跳过。")
+            return False
+
+        # 2. 根据规则生成标签
+        genre_ids = [genre['id'] for genre in details.get('genres', [])]
+        
+        countries = []
+        origin_country = details.get('origin_country')
+        if origin_country:
+            if isinstance(origin_country, list):
+                countries = origin_country
+            elif isinstance(origin_country, str):
+                countries = [origin_country]
+        
+        if not countries:
+            original_language = details.get('original_language')
+            if original_language:
+                lang_to_country_map = {
+                    "en": "US", "zh": "CN", "ja": "JP", "ko": "KR", "fr": "FR", "de": "DE",
+                    "es": "ES", "it": "IT", "hi": "IN", "ar": "SA", "pt": "BR", "ru": "RU",
+                    "th": "TH", "sv": "SE", "da": "DK", "no": "NO", "nl": "NL", "pl": "PL",
+                }
+                mapped_country = lang_to_country_map.get(original_language)
+                if mapped_country:
+                    countries = [mapped_country]
+        
+        media_year = None
+        if media_type_tmdb == 'movie':
+            release_date = details.get('release_date')
+            if release_date and len(release_date) >= 4:
+                media_year = int(release_date[:4])
+        elif media_type_tmdb == 'tv':
+            first_air_date = details.get('first_air_date')
+            if first_air_date and len(first_air_date) >= 4:
+                media_year = int(first_air_date[:4])
+        
+        rule_item_type = 'movie' if item_type == 'Movie' else 'series' if item_type == 'Series' else 'all'
+        generated_tags = rule_service.generate_tags(countries, genre_ids, media_year, rule_item_type)
+
+        if not generated_tags:
+            logger.info(f"项目 '{item_name}' 未生成任何标签，跳过更新。")
+            return False
+
+        # 3. 更新 Emby 项目的元数据
+        if update_item_metadata(item_id=item_id, tags_to_set=generated_tags, mode=mode):
+            return True
+        else:
+            return False
+
+    except Exception as e:
+        logger.error(f"处理项目 '{item_name}' (ID: {item_id}) 时发生错误: {e}")
+        return False
+
+
 async def tag_all_media_items(mode: Literal['merge', 'overwrite'] = 'merge') -> dict:
     """
     遍历所有 Emby 媒体库中的电影和剧集，根据规则进行打标签。
+    处理多版本电影只打一个标签，多版本电视剧全部打标签的逻辑。
     """
     from services import tmdb_service, rule_service # 避免循环引用
     import logging
+    from collections import defaultdict
 
     logger = logging.getLogger(__name__)
 
@@ -293,107 +380,42 @@ async def tag_all_media_items(mode: Literal['merge', 'overwrite'] = 'merge') -> 
     processed_count = 0
     updated_count = 0
     failed_count = 0
-    
+
+    # 按 TMDB ID 和 ItemType 分组项目
+    grouped_items: Dict[str, Dict[str, List[dict]]] = defaultdict(lambda: defaultdict(list))
     for item in all_items:
-        item_id = item.get('Id')
-        item_name = item.get('Name')
-        item_type = item.get('Type') # "Movie" or "Series"
         tmdb_id = item.get('ProviderIds', {}).get('Tmdb')
-
-        if not all([item_id, item_name, item_type, tmdb_id]):
-            logger.warning(f"跳过项目 '{item_name}' (ID: {item_id})，缺少关键信息。")
-            continue
-
-        logger.info(f"正在处理项目 '{item_name}' (ID: {item_id}, TMDB ID: {tmdb_id}, 类型: {item_type})...")
-        processed_count += 1
-
-        try:
-            # 1. 从 TMDB 获取详细信息
-            media_type_tmdb = 'movie' if item_type == 'Movie' else 'tv' if item_type == 'Series' else None
-            if not media_type_tmdb:
-                logger.warning(f"不支持的媒体类型: {item_type}，跳过处理。")
-                continue
-
-            details = tmdb_service.get_tmdb_details(tmdb_id, media_type_tmdb)
-            if not details:
-                logger.warning(f"无法从 TMDB 获取项目 '{item_name}' (TMDB ID: {tmdb_id}) 的信息，跳过。")
-                failed_count += 1
-                continue
-
-            # 2. 根据规则生成标签
-            genre_ids = [genre['id'] for genre in details.get('genres', [])]
-            
-            countries = []
-            # 统一电影和剧集的国家提取逻辑，严格遵循用户要求
-            # 优先级: origin_country -> original_language
-            origin_country = details.get('origin_country')
-            if origin_country:
-                if isinstance(origin_country, list):
-                    countries = origin_country # 直接使用整个列表
-                elif isinstance(origin_country, str):
-                    countries = [origin_country]
-            
-            # 如果以上都无法提供国家，则 countries 保持为空
-                
-            if not countries:
-                original_language = details.get('original_language')
-                if original_language:
-                    # 简单的语言到国家映射，可能不完全准确，但符合用户要求
-                    lang_to_country_map = {
-                        "en": "US", # 英语通常指美国
-                        "zh": "CN", # 中文
-                        "ja": "JP", # 日语
-                        "ko": "KR", # 韩语
-                        "fr": "FR", # 法语
-                        "de": "DE", # 德语
-                        "es": "ES", # 西班牙语
-                        "it": "IT", # 意大利语
-                        "hi": "IN", # 印地语
-                        "ar": "SA", # 阿拉伯语
-                        "pt": "BR", # 葡萄牙语
-                        "ru": "RU", # 俄语
-                        "th": "TH", # 泰语
-                        "sv": "SE", # 瑞典语
-                        "da": "DK", # 丹麦语
-                        "no": "NO", # 挪威语
-                        "nl": "NL", # 荷兰语
-                        "pl": "PL", # 波兰语
-                        # 可以根据需要添加更多映射
-                    }
-                    mapped_country = lang_to_country_map.get(original_language)
-                    if mapped_country:
-                        countries = [mapped_country]
-            
-            # 如果 origin_country 和 original_language 都无法提供国家，则 countries 保持为空
-            
-            # 提取年份信息
-            media_year = None
-            if media_type_tmdb == 'movie':
-                release_date = details.get('release_date')
-                if release_date and len(release_date) >= 4:
-                    media_year = int(release_date[:4])
-            elif media_type_tmdb == 'tv':
-                first_air_date = details.get('first_air_date')
-                if first_air_date and len(first_air_date) >= 4:
-                    media_year = int(first_air_date[:4])
-            
-            # 将 Emby 的 ItemType 转换为后端规则使用的 item_type ("movie" 或 "series")
-            rule_item_type = 'movie' if item_type == 'Movie' else 'series' if item_type == 'Series' else 'all'
-            generated_tags = rule_service.generate_tags(countries, genre_ids, media_year, rule_item_type)
-
-            if not generated_tags:
-                logger.info(f"项目 '{item_name}' 未生成任何标签，跳过更新。")
-                continue
-
-            # 3. 更新 Emby 项目的元数据
-            if update_item_metadata(item_id=item_id, tags_to_set=generated_tags, mode=mode):
-                updated_count += 1
+        item_type = item.get('Type') # "Movie" or "Series"
+        if tmdb_id and item_type:
+            grouped_items[tmdb_id][item_type].append(item)
+    
+    for tmdb_id, types_map in grouped_items.items():
+        for item_type, items_list in types_map.items():
+            if item_type == 'Movie':
+                # 对于电影，只处理第一个项目
+                if items_list:
+                    item = items_list[0]
+                    processed_count += 1
+                    if await _process_single_item_for_tagging(item, mode, logger, tmdb_service, rule_service):
+                        updated_count += 1
+                    else:
+                        failed_count += 1
+            elif item_type == 'Series':
+                # 对于电视剧，处理所有项目
+                for item in items_list:
+                    processed_count += 1
+                    if await _process_single_item_for_tagging(item, mode, logger, tmdb_service, rule_service):
+                        updated_count += 1
+                    else:
+                        failed_count += 1
             else:
-                failed_count += 1
-
-        except Exception as e:
-            logger.error(f"处理项目 '{item_name}' (ID: {item_id}) 时发生错误: {e}")
-            failed_count += 1
+                # 对于其他未知类型，也处理所有项目（或者根据需求决定跳过）
+                for item in items_list:
+                    processed_count += 1
+                    if await _process_single_item_for_tagging(item, mode, logger, tmdb_service, rule_service):
+                        updated_count += 1
+                    else:
+                        failed_count += 1
 
     logger.info(f"所有媒体项目打标签完成。总处理 {processed_count} 个，成功更新 {updated_count} 个，失败 {failed_count} 个。")
     return {
