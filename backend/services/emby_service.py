@@ -168,36 +168,41 @@ def get_all_emby_items(item_type: str = "Movie,Series") -> List[dict]:
         print("错误: EMBY_SERVER_URL 未配置")
         return []
 
-    user_id = _get_user_id()
-    if not user_id:
-        print("错误: 无法获取 Emby UserID，无法继续查找。")
-        return []
-
-    url = f"{config.EMBY_SERVER_URL}/emby/Users/{user_id}/Items"
+    # 使用 /emby/Items 端点，与桌面版保持一致
+    url = f"{config.EMBY_SERVER_URL}/emby/Items"
     params = {
         'Recursive': 'true',
         'IncludeItemTypes': item_type,
         'Fields': 'ProviderIds,Tags,TagItems,LockedFields',
-        'Limit': 10000 # 增加限制以获取更多项目，Emby API 默认可能只有少量
+        'Limit': 100, # 将 Limit 设置为较小的值，以便更好地观察分页
+        'api_key': config.EMBY_API_KEY # 在参数中包含 api_key
     }
     
     all_items = []
     start_index = 0
+    import logging
+    logger = logging.getLogger(__name__) # 获取 logger 实例
+
     while True:
         current_params = params.copy()
         current_params['StartIndex'] = start_index
         try:
+            logger.info(f"正在获取 Emby 项目: StartIndex={start_index}, Limit={params['Limit']}") # 新增日志
+            # 同时使用请求头和查询参数，以确保兼容性
             response = requests.get(url, headers=_get_headers(), params=current_params)
             response.raise_for_status()
             data = response.json()
             items = data.get('Items', [])
             all_items.extend(items)
             
-            if len(items) < params['Limit']: # 如果返回的项目少于限制，说明已经获取完所有项目
+            total_count = data.get('TotalRecordCount', 0)
+            logger.info(f"当前获取到 {len(items)} 个项目，总记录数: {total_count}，已获取总数: {len(all_items)}") # 新增日志
+
+            if not items or len(all_items) >= total_count: # 如果当前页没有项目，或者已获取的项目数达到或超过总数，说明已经获取完所有项目
                 break
             start_index += params['Limit']
         except requests.exceptions.RequestException as e:
-            print(f"获取所有 Emby 项目时出错: {e}")
+            logger.error(f"获取所有 Emby 项目时出错: {e}") # 使用 logger.error
             return []
     return all_items
 
@@ -376,7 +381,8 @@ async def tag_all_media_items(mode: Literal['merge', 'overwrite'] = 'merge') -> 
 
     logger.info(f"开始对所有 Emby 媒体项目进行打标签操作 (模式: {mode})...")
     all_items = get_all_emby_items()
-    
+    logger.info(f"从 Emby API 获取到 {len(all_items)} 个媒体项目。") # 新增日志
+
     processed_count = 0
     updated_count = 0
     failed_count = 0
@@ -389,19 +395,15 @@ async def tag_all_media_items(mode: Literal['merge', 'overwrite'] = 'merge') -> 
         if tmdb_id and item_type:
             grouped_items[tmdb_id][item_type].append(item)
     
+    # 新增日志：打印分组后的项目数量
     for tmdb_id, types_map in grouped_items.items():
         for item_type, items_list in types_map.items():
-            if item_type == 'Movie':
-                # 对于电影，只处理第一个项目
-                if items_list:
-                    item = items_list[0]
-                    processed_count += 1
-                    if await _process_single_item_for_tagging(item, mode, logger, tmdb_service, rule_service):
-                        updated_count += 1
-                    else:
-                        failed_count += 1
-            elif item_type == 'Series':
-                # 对于电视剧，处理所有项目
+            logger.info(f"TMDB ID: {tmdb_id}, 类型: {item_type}, 包含 {len(items_list)} 个 Emby 项目。")
+
+    for tmdb_id, types_map in grouped_items.items():
+        for item_type, items_list in types_map.items():
+            if item_type == 'Movie' or item_type == 'Series':
+                # 对于电影和电视剧，处理所有项目
                 for item in items_list:
                     processed_count += 1
                     if await _process_single_item_for_tagging(item, mode, logger, tmdb_service, rule_service):
