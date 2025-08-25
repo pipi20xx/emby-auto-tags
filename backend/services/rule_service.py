@@ -59,7 +59,11 @@ def generate_tags(countries: List[str], genre_ids: List[int], item_type: str) ->
 
         # 检查媒体类型匹配
         # 如果规则的 item_type 是 "all"，或者与当前 item_type 匹配，则通过
-        type_match = (rule_item_type == "all") or (rule_item_type == item_type)
+        # 特殊处理：如果 rule_item_type 是 "series"，则 item_type 为 "series" 或 "tv" 都算匹配
+        if rule_item_type == "series":
+            type_match = (item_type == "series") or (item_type == "tv")
+        else:
+            type_match = (rule_item_type == "all") or (rule_item_type == item_type)
 
         # 必须同时满足国家、类型和媒体类型条件（如果它们被定义的话）
         if country_match and genre_match and type_match:
