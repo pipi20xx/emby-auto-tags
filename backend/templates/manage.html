@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Emby 自动标签 - 管理面板</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <h1>Emby 自动标签 - 管理面板</h1>
+
+    <!-- Webhook 管理 -->
+    <div class="container">
+        <h2>Emby Webhook 自动化</h2>
+        <div id="webhook-settings">
+            <div style="margin-bottom: 15px;">
+                <label style="display: flex; align-items: center; font-weight: normal;">
+                    <input type="checkbox" id="webhook-enabled" style="width: auto; margin-right: 10px;">
+                    <strong>启用 Emby Webhook 接收器 (主开关)</strong>
+                </label>
+            </div>
+            <div style="margin-bottom: 15px;">
+                <label style="display: flex; align-items: center; font-weight: normal;">
+                    <input type="checkbox" id="automation-enabled" style="width: auto; margin-right: 10px;">
+                    <strong>启用自动化处理 (处理接收到的数据)</strong>
+                </label>
+            </div>
+            <div style="margin-bottom: 15px;">
+                <label style="font-weight: bold;">自动化写入模式:</label>
+                <div style="padding-left: 10px;">
+                    <label style="display: inline-block; margin-right: 20px; font-weight: normal;"><input type="radio" name="webhook-write-mode" value="merge"> 合并现有标签</label>
+                    <label style="display: inline-block; font-weight: normal;"><input type="radio" name="webhook-write-mode" value="overwrite"> 覆盖所有标签</label>
+                </div>
+            </div>
+            <div>
+                <label for="webhook-token">安全密钥 (Token):</label>
+                <input type="text" id="webhook-token" readonly>
+            </div>
+            <div>
+                <label for="webhook-url">Webhook URL (自动生成):</label>
+                <div style="display: flex;">
+                    <input type="text" id="webhook-url" readonly style="flex-grow: 1; margin-right: 10px;">
+                    <button id="copy-webhook-url-btn" style="flex-shrink: 0;">复制</button>
+                </div>
+            </div>
+        </div>
+        <div id="webhook-result" class="result hidden"></div>
+    </div>
+
+    <!-- 配置管理 -->
+    <div class="container">
+        <h2>配置管理</h2>
+        <form id="config-form">
+            <!-- 配置项将由JS动态填充 -->
+        </form>
+        <button id="save-config-btn">保存配置</button>
+        <div id="config-result" class="result hidden"></div>
+    </div>
+
+    <!-- TMDB 测试 -->
+    <div class="container">
+        <h2>TMDB 信息获取测试</h2>
+        <form id="tmdb-form">
+            <label for="tmdb-id">TMDB ID:</label>
+            <input type="text" id="tmdb-id" placeholder="例如: 550 (搏击俱乐部)" required>
+            <label for="tmdb-type">媒体类型:</label>
+            <select id="tmdb-type">
+                <option value="movie">电影</option>
+                <option value="tv">电视剧</option>
+            </select>
+            <button type="submit">获取信息</button>
+        </form>
+        <div id="tmdb-result" class="result hidden"></div>
+    </div>
+
+    <!-- 规则管理 -->
+    <div class="container">
+        <h2>标签规则管理</h2>
+        <table id="rules-table">
+            <thead>
+                <tr>
+                    <th>规则名称</th>
+                    <th>生成的标签</th>
+                    <th>国家/地区</th>
+                    <th>类型</th>
+                    <th>作用于</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody id="rules-table-body">
+                <!-- 规则将由JS动态填充 -->
+            </tbody>
+        </table>
+        <br>
+        <button id="add-rule-btn">添加新规则</button>
+        <hr>
+        <button id="save-rules-btn">保存所有规则</button>
+        <div id="rules-result" class="result hidden"></div>
+    </div>
+
+    <!-- Emby 写入测试 -->
+    <div class="container">
+        <h2>Emby 标签写入测试</h2>
+        <form id="emby-form">
+            <label for="emby-tmdb-id">TMDB ID:</label>
+            <input type="text" id="emby-tmdb-id" placeholder="输入 Emby 库中存在的 TMDB ID" required>
+            
+            <label for="emby-media-type">媒体类型:</label>
+            <select id="emby-media-type" style="margin-bottom: 15px;">
+                <option value="Movie">电影</option>
+                <option value="Series">剧集</option>
+            </select>
+
+            <label for="emby-tags">要写入的标签 (英文逗号分隔):</label>
+            <input type="text" id="emby-tags" placeholder="例如: 测试标签1,测试标签2" required>
+            
+            <label>写入模式:</label>
+            <div style="margin-bottom: 15px;">
+                <label style="display: inline-block; margin-right: 20px; font-weight: normal;"><input type="radio" name="emby-write-mode" value="merge" checked> 合并现有标签</label>
+                <label style="display: inline-block; font-weight: normal;"><input type="radio" name="emby-write-mode" value="overwrite"> 覆盖所有标签</label>
+            </div>
+
+            <button type="button" id="emby-test-btn">测试写入 (预览)</button>
+            <button type="button" id="emby-write-btn" style="background-color: #c0392b;">确认写入</button>
+        </form>
+        <div id="emby-result" class="result hidden"></div>
+    </div>
+
+    <!-- 清除所有标签 -->
+    <div class="container">
+        <h2>清除所有 Emby 媒体库标签</h2>
+        <p style="color: red; font-weight: bold;">警告: 此操作将清除 Emby 媒体库中所有电影和剧集的标签，不可撤销！</p>
+        <button type="button" id="clear-all-tags-btn" style="background-color: #e74c3c;">确认清除所有标签</button>
+        <div id="clear-all-tags-result" class="result hidden"></div>
+    </div>
+
+    <!-- 一键打标签 -->
+    <div class="container">
+        <h2>一键为所有媒体打标签</h2>
+        <p>此功能将遍历 Emby 媒体库中所有电影和剧集，根据已配置的规则自动生成并应用标签。</p>
+        <div style="margin-bottom: 15px;">
+            <label style="font-weight: bold;">写入模式:</label>
+            <div style="padding-left: 10px;">
+                <label style="display: inline-block; margin-right: 20px; font-weight: normal;"><input type="radio" name="tag-all-media-mode" value="merge" checked> 合并现有标签</label>
+                <label style="display: inline-block; font-weight: normal;"><input type="radio" name="tag-all-media-mode" value="overwrite"> 覆盖所有标签</label>
+            </div>
+        </div>
+        <button type="button" id="tag-all-media-btn" style="background-color: #27ae60;">开始一键打标签</button>
+        <div id="tag-all-media-result" class="result hidden"></div>
+    </div>
+
+    <!-- 整合测试 -->
+    <div class="container">
+        <h2>整合流程测试</h2>
+        <form id="full-flow-form">
+            <label for="full-flow-tmdb-id">TMDB ID:</label>
+            <input type="text" id="full-flow-tmdb-id" placeholder="例如: 550" required>
+            <label for="full-flow-media-type">媒体类型:</label>
+            <select id="full-flow-media-type">
+                <option value="movie">电影</option>
+                <option value="tv">电视剧</option>
+            </select>
+            <button type="submit">获取信息并预览标签</button>
+        </form>
+        <div id="full-flow-result" class="result hidden"></div>
+    </div>
+
+    <!-- 规则编辑/添加 Modal -->
+    <div id="rule-modal" class="modal hidden">
+        <div class="modal-content">
+            <span class="close-btn">&times;</span>
+            <h3 id="modal-title">添加新规则</h3>
+            <form id="rule-form">
+                <input type="hidden" id="rule-index">
+                <label for="rule-name">规则名称:</label>
+                <input type="text" id="rule-name" required>
+                <label for="rule-tag">生成的标签:</label>
+                <input type="text" id="rule-tag" required>
+                <label>国家/地区:</label>
+                <div id="rule-countries-container" class="checkbox-container"></div>
+                <label>类型:</label>
+                <div id="rule-genres-container" class="checkbox-container"></div>
+                <label for="rule-item-type">作用于:</label>
+                <select id="rule-item-type">
+                    <option value="all">全部</option>
+                    <option value="movie">电影</option>
+                    <option value="series">剧集</option>
+                </select>
+                <button type="submit">保存规则</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="/static/js/main.js"></script>
+</body>
+</html>

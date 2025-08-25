@@ -1,7 +1,7 @@
 from fastapi import FastAPI
-from fastapi.responses import RedirectResponse
+from fastapi.staticfiles import StaticFiles
 from core import config
-from api import endpoints
+from api.routers import manage, tasks, webhook, config as config_router, rules, data, test
 import logging
 import sys
 
@@ -25,13 +25,18 @@ app = FastAPI(
 # 键为 task_id (str), 值为任务状态字典 (dict)
 app.state.task_manager = {}
 
+# 挂载静态文件目录
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
 # 包含 API 路由
 API_PREFIX = "/api"
-app.include_router(endpoints.api_router, prefix=API_PREFIX)
-
-@app.get("/")
-async def root_redirect():
-    return RedirectResponse(url="/api/manage")
+app.include_router(manage.router)
+app.include_router(tasks.router, prefix=API_PREFIX)
+app.include_router(webhook.router, prefix=API_PREFIX)
+app.include_router(config_router.router, prefix=API_PREFIX)
+app.include_router(rules.router, prefix=API_PREFIX)
+app.include_router(data.router, prefix=API_PREFIX)
+app.include_router(test.router, prefix=API_PREFIX)
 
 @app.on_event("startup")
 async def startup_event():

@@ -4,3 +4,5 @@ requests
 pydantic
 ratelimit
 backoff
+jinja2
+aiofiles

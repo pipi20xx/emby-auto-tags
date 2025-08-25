@@ -6,11 +6,14 @@
       "conditions": {
         "countries": [
           "KR",
+          "MX",
           "JP"
         ],
-        "genre_ids": []
+        "genre_ids": [
+          9648
+        ]
       },
-      "item_type": "series"
+      "item_type": "movie"
     },
     {
       "name": "国产剧",
