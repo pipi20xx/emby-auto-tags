@@ -353,12 +353,15 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // Set item_type
             document.getElementById('rule-item-type').value = rule.item_type || 'all';
+            // Set match_all_conditions checkbox
+            document.getElementById('rule-match-all-conditions').checked = rule.match_all_conditions || false;
 
         } else {
             // Add mode
             modalTitle.textContent = '添加新规则';
             document.getElementById('rule-index').value = '';
             document.getElementById('rule-item-type').value = 'all'; // Default for new rules
+            document.getElementById('rule-match-all-conditions').checked = false; // Default for new rules
         }
         ruleModal.classList.remove('hidden');
     }
@@ -405,8 +408,15 @@ document.addEventListener('DOMContentLoaded', function() {
         const selectedCountries = Array.from(ruleForm.querySelectorAll('input[name="countries"]:checked')).map(cb => cb.value);
         const selectedGenreIds = Array.from(ruleForm.querySelectorAll('input[name="genres"]:checked')).map(cb => parseInt(cb.value, 10));
         const itemType = document.getElementById('rule-item-type').value;
+        const matchAllConditions = document.getElementById('rule-match-all-conditions').checked;
 
-        const newRule = { name, tag, conditions: { countries: selectedCountries, genre_ids: selectedGenreIds }, item_type: itemType };
+        const newRule = { 
+            name, 
+            tag, 
+            conditions: { countries: selectedCountries, genre_ids: selectedGenreIds }, 
+            item_type: itemType,
+            match_all_conditions: matchAllConditions
+        };
 
         if (index) {
             // Update existing rule

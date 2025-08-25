@@ -44,18 +44,36 @@ def generate_tags(countries: List[str], genre_ids: List[int], item_type: str) ->
         rule_countries = conditions.get("countries", [])
         rule_genre_ids = conditions.get("genre_ids", [])
         rule_item_type = rule.get("item_type", "all") # 默认为 "all"
+        # 新增：是否所有条件都必须匹配 (默认为 False，即模糊匹配)
+        match_all_conditions = rule.get("match_all_conditions", False)
 
         # 如果规则中既没有国家也没有类型，则跳过
         if not rule_countries and not rule_genre_ids:
             continue
 
         # 检查国家匹配
-        # 如果规则中定义了国家，则必须匹配；如果未定义，则视为通过
-        country_match = (not rule_countries) or any(c in rule_countries for c in countries)
+        # 如果规则中定义了国家，则根据 match_all_conditions 判断匹配方式
+        if rule_countries:
+            if match_all_conditions:
+                # 必须所有国家都匹配
+                country_match = all(c in rule_countries for c in countries)
+            else:
+                # 只要有一个国家匹配
+                country_match = any(c in rule_countries for c in countries)
+        else:
+            country_match = True # 如果规则中未定义国家，则视为通过
 
         # 检查类型匹配
-        # 如果规则中定义了类型，则必须匹配；如果未定义，则视为通过
-        genre_match = (not rule_genre_ids) or any(gid in rule_genre_ids for gid in genre_ids)
+        # 如果规则中定义了类型，则根据 match_all_conditions 判断匹配方式
+        if rule_genre_ids:
+            if match_all_conditions:
+                # 必须所有类型都匹配
+                genre_match = all(gid in rule_genre_ids for gid in genre_ids)
+            else:
+                # 只要有一个类型匹配
+                genre_match = any(gid in rule_genre_ids for gid in genre_ids)
+        else:
+            genre_match = True # 如果规则中未定义类型，则视为通过
 
         # 检查媒体类型匹配
         # 如果规则的 item_type 是 "all"，或者与当前 item_type 匹配，则通过
@@ -68,5 +86,4 @@ def generate_tags(countries: List[str], genre_ids: List[int], item_type: str) ->
         # 必须同时满足国家、类型和媒体类型条件（如果它们被定义的话）
         if country_match and genre_match and type_match:
             generated_tags.add(rule["tag"])
-
     return list(generated_tags)
