@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Body, BackgroundTasks, Request, HTTPException
-from typing import Dict, Any, Literal
+from typing import Dict, Any, Literal, List, Optional # 导入 List 和 Optional
 from services import emby_service
 from core import config as core_config
 import uuid
@@ -13,15 +13,16 @@ async def _run_tag_all_media_task(
     task_id: str,
     mode: Literal['merge', 'overwrite'],
     library_type: Literal['all', 'favorite'],
-    task_manager: Dict[str, Any]
+    task_manager: Dict[str, Any],
+    custom_tags: Optional[List[str]] = None # 添加 custom_tags 参数
 ):
     """
     实际执行打标签任务的后台函数。
     """
     try:
         task_manager[task_id]["status"] = "running"
-        logger.info(f"任务 {task_id}: 开始对媒体进行打标签操作 (模式: {mode}, 库类型: {library_type})...")
-        result = await emby_service.tag_all_media_items(mode=mode, library_type=library_type)
+        logger.info(f"任务 {task_id}: 开始对媒体进行打标签操作 (模式: {mode}, 库类型: {library_type}, 自定义标签: {custom_tags})...")
+        result = await emby_service.tag_all_media_items(mode=mode, library_type=library_type, custom_tags=custom_tags) # 传递 custom_tags
         task_manager[task_id].update(result)
         task_manager[task_id]["status"] = "completed"
         logger.info(f"任务 {task_id}: 打标签任务完成。结果: {result}")
@@ -35,7 +36,8 @@ async def tag_all_media(
     request: Request,
     background_tasks: BackgroundTasks,
     mode: Literal['merge', 'overwrite'] = Body('merge', embed=True),
-    library_type: Literal['all', 'favorite'] = Body('all', embed=True)
+    library_type: Literal['all', 'favorite'] = Body('all', embed=True),
+    custom_tags: Optional[List[str]] = Body(None, embed=True) # 添加 custom_tags 参数
 ):
     """
     触发对 Emby 媒体库中的电影和剧集进行打标签操作。
@@ -48,14 +50,15 @@ async def tag_all_media(
         "status": "pending",
         "mode": mode,
         "library_type": library_type,
+        "custom_tags": custom_tags, # 存储 custom_tags
         "processed_count": 0,
         "updated_count": 0,
         "failed_count": 0,
         "start_time": core_config.get_current_time()
     }
     
-    logger.info(f"收到请求：启动后台打标签任务 {task_id} (模式: {mode}, 库类型: {library_type})...")
-    background_tasks.add_task(_run_tag_all_media_task, task_id, mode, library_type, task_manager)
+    logger.info(f"收到请求：启动后台打标签任务 {task_id} (模式: {mode}, 库类型: {library_type}, 自定义标签: {custom_tags})...")
+    background_tasks.add_task(_run_tag_all_media_task, task_id, mode, library_type, task_manager, custom_tags) # 传递 custom_tags
     return {"message": "打标签任务已在后台启动。", "task_id": task_id}
 
 @router.get("/tag_all_media/status/{task_id}", tags=["Tasks"])

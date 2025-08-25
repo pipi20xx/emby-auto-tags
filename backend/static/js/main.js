@@ -636,9 +636,19 @@ document.addEventListener('DOMContentLoaded', function() {
     const tagAllMediaResult = document.getElementById('tag-all-media-result');
     const tagAllMediaModeRadios = document.querySelectorAll('input[name="tag-all-media-mode"]');
     const tagAllMediaLibraryTypeRadios = document.querySelectorAll('input[name="tag-all-media-library-type"]');
+    const useCustomTagsCheckbox = document.getElementById('use-custom-tags-for-all-media');
+    const customTagsInput = document.getElementById('custom-tags-for-all-media');
 
     let currentTagAllMediaTaskId = null;
     let tagAllMediaPollingInterval = null;
+
+    // 自定义标签输入框的启用/禁用逻辑
+    useCustomTagsCheckbox.addEventListener('change', () => {
+        customTagsInput.disabled = !useCustomTagsCheckbox.checked;
+        if (!useCustomTagsCheckbox.checked) {
+            customTagsInput.value = ''; // 清空输入框内容
+        }
+    });
 
     async function pollTagAllMediaStatus(taskId) {
         if (!taskId) return;
@@ -676,10 +686,23 @@ document.addEventListener('DOMContentLoaded', function() {
     tagAllMediaBtn.addEventListener('click', async () => {
         const mode = document.querySelector('input[name="tag-all-media-mode"]:checked').value;
         const libraryType = document.querySelector('input[name="tag-all-media-library-type"]:checked').value;
+        let customTags = [];
+
+        if (useCustomTagsCheckbox.checked) {
+            customTags = customTagsInput.value.split(',').map(tag => tag.trim()).filter(Boolean);
+            if (customTags.length === 0) {
+                showToast('请在选中“使用自定义标签”时输入至少一个自定义标签。', true);
+                return;
+            }
+        }
         
+        const confirmText = useCustomTagsCheckbox.checked && customTags.length > 0
+            ? `您确定要以 [${mode === 'merge' ? '合并' : '覆盖'}] 模式，对 Emby 媒体库中的 [${libraryType === 'all' ? '全库' : '最爱/收藏'}] 电影和剧集进行打标签操作吗？将使用自定义标签: ${customTags.join(', ')}。此操作将在后台执行，并在页面上显示进度。`
+            : `您确定要以 [${mode === 'merge' ? '合并' : '覆盖'}] 模式，对 Emby 媒体库中的 [${libraryType === 'all' ? '全库' : '最爱/收藏'}] 电影和剧集进行打标签操作吗？此操作将在后台执行，并在页面上显示进度。`;
+
         const result = await Swal.fire({
             title: '确认一键打标签?',
-            text: `您确定要以 [${mode === 'merge' ? '合并' : '覆盖'}] 模式，对 Emby 媒体库中的 [${libraryType === 'all' ? '全库' : '最爱/收藏'}] 电影和剧集进行打标签操作吗？此操作将在后台执行，并在页面上显示进度。`,
+            text: confirmText,
             icon: 'info',
             showCancelButton: true,
             confirmButtonColor: '#3085d6',
@@ -704,7 +727,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const response = await fetch(`${apiPrefix}/tag_all_media`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ mode: mode, library_type: libraryType })
+                body: JSON.stringify({ mode: mode, library_type: libraryType, custom_tags: customTags.length > 0 ? customTags : null })
             });
             const result = await response.json();
             if (!response.ok) throw new Error(result.detail || '启动任务失败');

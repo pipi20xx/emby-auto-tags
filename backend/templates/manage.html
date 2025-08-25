@@ -164,6 +164,13 @@
                 <label style="display: inline-block; font-weight: normal;"><input type="radio" name="tag-all-media-library-type" value="favorite"> 最爱/收藏</label>
             </div>
         </div>
+        <div style="margin-bottom: 15px;">
+            <label style="display: flex; align-items: center; font-weight: normal;">
+                <input type="checkbox" id="use-custom-tags-for-all-media" style="width: auto; margin-right: 10px;">
+                <strong>使用自定义标签</strong>
+            </label>
+            <input type="text" id="custom-tags-for-all-media" placeholder="自定义标签 (英文逗号分隔)" style="margin-top: 5px; width: 100%;" disabled>
+        </div>
         <button type="button" id="tag-all-media-btn" style="background-color: #27ae60;">开始一键打标签</button>
         <div id="tag-all-media-result" class="result hidden"></div>
     </div>
