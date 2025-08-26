@@ -71,9 +71,20 @@ async def receive_webhook(token: str, payload: Dict[Any, Any] = Body(...)):
 
         genre_ids = [genre['id'] for genre in details.get('genres', [])]
         countries = [country['iso_3166_1'] for country in details.get('production_countries', [])]
-        logger.info(f"提取的 TMDB 信息: Genres={genre_ids}, Countries={countries}")
         
-        generated_tags = rule_service.generate_tags(countries, genre_ids)
+        media_year = None
+        if item_type == 'Movie':
+            release_date = details.get('release_date')
+            if release_date:
+                media_year = int(release_date.split('-')[0])
+        elif item_type == 'Series':
+            first_air_date = details.get('first_air_date')
+            if first_air_date:
+                media_year = int(first_air_date.split('-')[0])
+
+        logger.info(f"提取的 TMDB 信息: Genres={genre_ids}, Countries={countries}, Year={media_year}")
+        
+        generated_tags = rule_service.generate_tags(countries, genre_ids, media_year, media_type_tmdb)
         logger.info(f"根据规则生成的标签: {generated_tags}")
 
         if not generated_tags:
