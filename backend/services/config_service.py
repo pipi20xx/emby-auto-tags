@@ -25,6 +25,10 @@ def get_config() -> dict:
         token = secrets.token_hex(32)
         config.set('WEBHOOK', 'secret_token', token)
         needs_saving = True
+        
+    if not config.has_option('WEBHOOK', 'delay_seconds'):
+        config.set('WEBHOOK', 'delay_seconds', '1') # 默认延迟1秒
+        needs_saving = True
 
     # --- TMDB 限流配置自动生成 ---
     if not config.has_section('TMDB'):
@@ -44,10 +48,6 @@ def get_config() -> dict:
     
     config_dict = {section: dict(config.items(section)) for section in config.sections()}
     
-    # 中文化 TMDB 配置项
-    if 'TMDB' in config_dict and 'rate_limit_period' in config_dict['TMDB']:
-        config_dict['TMDB']['TMDB 访问频率限制周期'] = config_dict['TMDB'].pop('rate_limit_period')
-        
     return config_dict
 
 def update_config(config_data: dict):

@@ -1,5 +1,6 @@
 from fastapi import APIRouter, HTTPException, Body
 from typing import Dict, Any
+import asyncio
 from services import config_service, tmdb_service, rule_service, emby_service
 import json
 import logging
@@ -41,7 +42,13 @@ async def receive_webhook(token: str, payload: Dict[Any, Any] = Body(...)):
         logger.info("Webhook 自动化处理当前已禁用，仅记录数据。")
         return {"status": "received", "message": "Webhook received, but automation is disabled."}
 
-    # 4. 开始自动化处理
+    # 4. 获取延迟设置并应用
+    delay_seconds = float(webhook_config.get('delay_seconds', '1'))
+    if delay_seconds > 0:
+        logger.info(f"Webhook 自动化处理将延迟 {delay_seconds} 秒。")
+        await asyncio.sleep(delay_seconds)
+
+    # 5. 开始自动化处理
     logger.info("--- 开始自动化处理 ---")
     try:
         item = payload.get('Item', {})

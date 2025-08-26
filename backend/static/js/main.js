@@ -53,11 +53,13 @@ document.addEventListener('DOMContentLoaded', function() {
         const automationEnabled = webhookConfig.automation_enabled === 'true';
         const writeMode = webhookConfig.write_mode || 'merge';
         const token = webhookConfig.secret_token || '';
+        const delaySeconds = webhookConfig.delay_seconds || '1'; // 获取延迟设置
 
         webhookEnabledCheckbox.checked = isEnabled;
         automationEnabledCheckbox.checked = automationEnabled;
         document.querySelector(`input[name="webhook-write-mode"][value="${writeMode}"]`).checked = true;
         webhookTokenInput.value = token;
+        document.getElementById('webhook-delay-seconds').value = delaySeconds; // 设置延迟输入框的值
         
         if (token) {
             // 使用 window.location.origin 来动态构建基础 URL
@@ -74,7 +76,7 @@ document.addEventListener('DOMContentLoaded', function() {
         showToast('URL 已复制到剪贴板！');
     });
 
-    async function saveWebhookSwitch(key, value) {
+    async function saveWebhookSetting(key, value) {
         if (currentFullConfig.WEBHOOK) {
             currentFullConfig.WEBHOOK[key] = value.toString();
             
@@ -86,29 +88,22 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
                 const result = await response.json();
                 if (!response.ok) throw new Error(result.detail || '保存失败');
-                const statusText = key === 'enabled' ? '接收器' : '自动化处理';
-                showToast(`${statusText}状态已更新为: ${value ? '启用' : '禁用'}`);
+                let statusText = '';
+                if (key === 'enabled') {
+                    statusText = '接收器';
+                } else if (key === 'automation_enabled') {
+                    statusText = '自动化处理';
+                } else if (key === 'delay_seconds') {
+                    statusText = '延迟设置';
+                } else if (key === 'write_mode') {
+                    statusText = '写入模式';
+                }
+                showToast(`${statusText}已更新为: ${value}`);
             } catch (error) {
                 showToast(`错误: ${error.message}`, true);
             }
         }
     }
-
-    webhookEnabledCheckbox.addEventListener('change', () => {
-        saveWebhookSwitch('enabled', webhookEnabledCheckbox.checked);
-    });
-
-    automationEnabledCheckbox.addEventListener('change', () => {
-        saveWebhookSwitch('automation_enabled', automationEnabledCheckbox.checked);
-    });
-
-    webhookWriteModeRadios.forEach(radio => {
-        radio.addEventListener('change', () => {
-            if (radio.checked) {
-                saveWebhookSwitch('write_mode', radio.value);
-            }
-        });
-    });
 
     async function loadConfig() {
         try {
@@ -132,13 +127,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 "server_url": "服务器地址",
                 "api_key": "API 密钥",
                 "user_id": "用户 ID (可选)",
-                "http_proxy": "HTTP 代理地址"
+                "http_proxy": "HTTP 代理地址",
+                "rate_limit_period": "TMDB 访问频率限制周期"
             };
 
             const defaultConfig = config['DEFAULT'] || {};
             
             for (const section in config) {
-                if (section === 'WEBHOOK') continue; // 不在通用表单中显示 WEBHOOK 部分
+                // WEBHOOK 部分由专门的 UI 处理，不在此处动态生成
+                if (section === 'WEBHOOK') {
+                    continue; 
+                }
                 const fieldset = document.createElement('fieldset');
                 const legend = document.createElement('legend');
                 legend.textContent = sectionNames[section] || `[${section}]`;
@@ -165,6 +164,31 @@ document.addEventListener('DOMContentLoaded', function() {
             showResult(configResult, `错误: ${error.message}`, true);
         }
     }
+
+    webhookEnabledCheckbox.addEventListener('change', () => {
+        saveWebhookSetting('enabled', webhookEnabledCheckbox.checked);
+    });
+
+    automationEnabledCheckbox.addEventListener('change', () => {
+        saveWebhookSetting('automation_enabled', automationEnabledCheckbox.checked);
+    });
+
+    webhookWriteModeRadios.forEach(radio => {
+        radio.addEventListener('change', () => {
+            if (radio.checked) {
+                saveWebhookSetting('write_mode', radio.value);
+            }
+        });
+    });
+
+    document.getElementById('webhook-delay-seconds').addEventListener('change', (e) => {
+        let delay = parseFloat(e.target.value);
+        if (isNaN(delay) || delay < 0) {
+            delay = 0; // 确保延迟不为负数
+            e.target.value = delay;
+        }
+        saveWebhookSetting('delay_seconds', delay.toString());
+    });
 
     saveConfigBtn.addEventListener('click', async () => {
         const formData = new FormData(configForm);
