@@ -277,7 +277,7 @@ document.addEventListener('DOMContentLoaded', function() {
         currentRules.forEach((rule, index) => {
             const countryNames = (rule.conditions.countries || []).map(code => dataMaps.countries[code] || code).join(', ');
             const genreNames = (rule.conditions.genre_ids || []).map(id => dataMaps.genres[id] || id).join(', ');
-            const yearsDisplay = (rule.conditions.years || []).join(', ') || '全部';
+            const yearsDisplay = rule.conditions.year_range_display || (rule.conditions.years || []).join(', ') || '全部';
 
             const itemTypeDisplay = {
                 "movie": "电影",
@@ -347,8 +347,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (checkbox) checkbox.checked = true;
             });
 
-            // Set years
-            document.getElementById('rule-years').value = (rule.conditions.years || []).join(', ');
+            // Set years or year range display
+            document.getElementById('rule-years').value = rule.conditions.year_range_display || (rule.conditions.years || []).join(', ');
 
             // Check selected genres
             (rule.conditions.genre_ids || []).forEach(id => {
@@ -415,16 +415,37 @@ document.addEventListener('DOMContentLoaded', function() {
         const itemType = document.getElementById('rule-item-type').value;
         const matchAllConditions = document.getElementById('rule-match-all-conditions').checked;
 
-        const selectedYears = document.getElementById('rule-years').value
+        const yearInput = document.getElementById('rule-years').value.trim();
+        let selectedYears = [];
+        let yearRange = null;
+
+        if (yearInput) {
+            const rangeMatch = yearInput.match(/^(\d{4})\s*-\s*(\d{4})$/);
+            if (rangeMatch) {
+                const startYear = parseInt(rangeMatch[1], 10);
+                const endYear = parseInt(rangeMatch[2], 10);
+                if (!isNaN(startYear) && !isNaN(endYear) && startYear <= endYear) {
+                    for (let year = startYear; year <= endYear; year++) {
+                        selectedYears.push(year);
+                    }
+                    yearRange = `${startYear}-${endYear}`; // Store original range string for display
+                } else {
+                    showToast('年份范围格式不正确或起始年份大于结束年份。', true);
+                    return; // Prevent saving invalid rule
+                }
+            } else {
+                selectedYears = yearInput
                                 .split(/[, ]+/) // Split by comma or space
                                 .filter(Boolean) // Remove empty strings
                                 .map(year => parseInt(year.trim(), 10))
                                 .filter(year => !isNaN(year)); // Ensure it's a valid number
+            }
+        }
 
         const newRule = { 
             name, 
             tag, 
-            conditions: { countries: selectedCountries, genre_ids: selectedGenreIds, years: selectedYears }, 
+            conditions: { countries: selectedCountries, genre_ids: selectedGenreIds, years: selectedYears, year_range_display: yearRange }, 
             item_type: itemType,
             match_all_conditions: matchAllConditions
         };

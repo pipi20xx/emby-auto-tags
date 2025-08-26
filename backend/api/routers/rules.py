@@ -8,7 +8,8 @@ router = APIRouter(prefix="/rules", tags=["Rules"])
 class RuleCondition(BaseModel):
     countries: Optional[List[str]] = Field(default_factory=list)
     genre_ids: Optional[List[int]] = Field(default_factory=list)
-    years: Optional[List[int]] = Field(default_factory=list) # Add years field
+    years: Optional[List[int]] = Field(default_factory=list)
+    year_range_display: Optional[str] = None # Add year_range_display field for frontend display
 
 class Rule(BaseModel):
     name: str

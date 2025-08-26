@@ -4,24 +4,18 @@
       "name": "qwdwqd",
       "tag": "123",
       "conditions": {
-        "countries": [],
+        "countries": [
+          "JP"
+        ],
         "genre_ids": [
           16
         ],
-        "years": []
-      },
-      "item_type": "all",
-      "match_all_conditions": false
-    },
-    {
-      "name": "12313",
-      "tag": "456",
-      "conditions": {
-        "countries": [],
-        "genre_ids": [
-          16
+        "years": [
+          2023,
+          2024,
+          2025
         ],
-        "years": []
+        "year_range_display": "2023-2025"
       },
       "item_type": "all",
       "match_all_conditions": false
