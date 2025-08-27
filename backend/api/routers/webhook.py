@@ -4,51 +4,33 @@ import asyncio
 from services import config_service, tmdb_service, rule_service, emby_service
 import json
 import logging
+from asyncio import Queue
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-@router.post("/webhook/{token}", tags=["Webhook"])
-async def receive_webhook(token: str, payload: Dict[Any, Any] = Body(...)):
+# 全局队列，将在 main.py 中初始化并传递
+webhook_queue: Queue = None
+
+async def _process_webhook_payload(payload: Dict[Any, Any]):
     """
-    接收 Emby Webhook 通知，验证 token 并根据配置进行自动化处理。
+    处理单个 Webhook payload 的核心逻辑。
     """
-    # 1. 验证 Token 和启用状态
     webhook_config = config_service.get_config().get('WEBHOOK', {})
-    is_enabled = webhook_config.get('enabled', 'false').lower() == 'true'
-    secret_token = webhook_config.get('secret_token')
-
-    if not is_enabled:
-        logger.warning("Webhook 接收器当前已禁用，忽略请求。")
-        raise HTTPException(status_code=403, detail="Webhook receiver is disabled.")
-
-    if not secret_token or token != secret_token:
-        logger.warning(f"收到无效的 Webhook token: {token}")
-        raise HTTPException(status_code=401, detail="Invalid webhook token.")
-
-    # 2. 记录接收到的数据
-    logger.info("--- 收到有效的 Webhook 请求 ---")
-    try:
-        pretty_payload = json.dumps(payload, indent=2, ensure_ascii=False)
-        logger.debug(pretty_payload)
-    except Exception as e:
-        logger.error(f"无法格式化为 JSON，记录原始数据: {e}")
-        logger.debug(payload)
-    
-    # 3. 检查自动化是否启用
     automation_enabled = webhook_config.get('automation_enabled', 'false').lower() == 'true'
+
     if not automation_enabled:
         logger.info("Webhook 自动化处理当前已禁用，仅记录数据。")
         return {"status": "received", "message": "Webhook received, but automation is disabled."}
 
-    # 4. 获取延迟设置并应用
+    # 获取延迟设置并应用
     delay_seconds = float(webhook_config.get('delay_seconds', '1'))
     if delay_seconds > 0:
         logger.info(f"Webhook 自动化处理将延迟 {delay_seconds} 秒。")
         await asyncio.sleep(delay_seconds)
 
-    # 5. 开始自动化处理
+    # 开始自动化处理
     logger.info("--- 开始自动化处理 ---")
     try:
         item = payload.get('Item', {})
@@ -118,3 +100,45 @@ async def receive_webhook(token: str, payload: Dict[Any, Any] = Body(...)):
         return {"status": "error", "message": "An error occurred during processing.", "detail": str(e)}
     finally:
         logger.info("--- 自动化处理结束 ---")
+
+@router.post("/webhook/{token}", tags=["Webhook"])
+async def receive_webhook(token: str, payload: Dict[Any, Any] = Body(...)):
+    """
+    接收 Emby Webhook 通知，验证 token 并将 payload 加入队列进行异步处理。
+    """
+    # 1. 验证 Token 和启用状态
+    webhook_config = config_service.get_config().get('WEBHOOK', {})
+    is_enabled = webhook_config.get('enabled', 'false').lower() == 'true'
+    secret_token = webhook_config.get('secret_token')
+
+    if not is_enabled:
+        logger.warning("Webhook 接收器当前已禁用，忽略请求。")
+        raise HTTPException(status_code=403, detail="Webhook receiver is disabled.")
+
+    if not secret_token or token != secret_token:
+        logger.warning(f"收到无效的 Webhook token: {token}")
+        raise HTTPException(status_code=401, detail="Invalid webhook token.")
+
+    # 2. 记录接收到的数据
+    logger.info("--- 收到有效的 Webhook 请求 ---")
+    try:
+        pretty_payload = json.dumps(payload, indent=2, ensure_ascii=False)
+        logger.debug(pretty_payload)
+    except Exception as e:
+        logger.error(f"无法格式化为 JSON，记录原始数据: {e}")
+        logger.debug(payload)
+    
+    # 3. 检查自动化是否启用 (这里只检查是否需要入队，实际处理中会再次检查)
+    automation_enabled = webhook_config.get('automation_enabled', 'false').lower() == 'true'
+    if not automation_enabled:
+        logger.info("Webhook 自动化处理当前已禁用，仅记录数据。")
+        return {"status": "received", "message": "Webhook received, but automation is disabled."}
+
+    # 4. 将 payload 加入队列
+    if webhook_queue:
+        await webhook_queue.put(payload)
+        logger.info("Webhook payload 已成功加入处理队列。")
+        return {"status": "queued", "message": "Webhook payload has been added to the processing queue."}
+    else:
+        logger.error("Webhook 队列未初始化，无法处理请求。")
+        raise HTTPException(status_code=500, detail="Webhook queue is not initialized.")
