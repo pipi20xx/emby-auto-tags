@@ -10,11 +10,7 @@
         "genre_ids": [
           16
         ],
-        "years": [
-          2023,
-          2024,
-          2025
-        ],
+        "years": [],
         "year_range_display": "2023-2025"
       },
       "item_type": "all",
@@ -54,7 +50,7 @@
       "tag": "被排除了就在这里",
       "conditions": {
         "countries": [
-          "DE"
+          "JP"
         ],
         "genre_ids": [
           16,
@@ -70,6 +66,25 @@
       },
       "item_type": "all",
       "match_all_conditions": true,
+      "is_negative_match": true
+    },
+    {
+      "name": "123",
+      "tag": "12",
+      "conditions": {
+        "countries": [
+          "CA",
+          "GB"
+        ],
+        "genre_ids": [
+          14,
+          9648
+        ],
+        "years": [],
+        "year_range_display": null
+      },
+      "item_type": "movie",
+      "match_all_conditions": false,
       "is_negative_match": true
     }
   ]

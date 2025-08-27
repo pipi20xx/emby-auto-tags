@@ -273,6 +273,10 @@ document.addEventListener('DOMContentLoaded', function() {
     const ruleForm = document.getElementById('rule-form');
     const modalTitle = document.getElementById('modal-title');
     const closeModalBtn = ruleModal.querySelector('.close-btn');
+    const showRulesExplanationBtn = document.getElementById('show-rules-explanation-btn');
+    const rulesExplanationModal = document.getElementById('rules-explanation-modal');
+    const closeExplanationModalBtn = document.getElementById('close-explanation-modal');
+    const hideExplanationModalBtn = document.getElementById('hide-rule-explanation-btn'); // 新增的关闭按钮
 
     let currentRules = [];
 
@@ -428,6 +432,27 @@ document.addEventListener('DOMContentLoaded', function() {
     window.addEventListener('click', (event) => {
         if (event.target == ruleModal) {
             closeModal();
+        }
+    });
+
+    // 规则说明模态框的显示/隐藏逻辑
+    showRulesExplanationBtn.addEventListener('click', () => {
+        rulesExplanationModal.classList.remove('hidden');
+    });
+
+    // 使用新的关闭按钮
+    hideExplanationModalBtn.addEventListener('click', () => {
+        rulesExplanationModal.classList.add('hidden');
+    });
+
+    // 兼容旧的关闭按钮（右上角的X）
+    closeExplanationModalBtn.addEventListener('click', () => {
+        rulesExplanationModal.classList.add('hidden');
+    });
+
+    window.addEventListener('click', (event) => {
+        if (event.target == rulesExplanationModal) {
+            rulesExplanationModal.classList.add('hidden');
         }
     });
 

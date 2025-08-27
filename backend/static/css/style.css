@@ -203,3 +203,57 @@ legend {
     font-weight: bold;
     color: #2c3e50;
 }
+
+/* Explanation Modal Specific Styles */
+.explanation-keyword {
+    color: #3498db; /* Blue for keywords */
+    font-weight: bold;
+}
+
+.explanation-positive {
+    color: #27ae60; /* Green for positive matches */
+    font-weight: bold;
+}
+
+.explanation-negative {
+    color: #e74c3c; /* Red for negative matches */
+    font-weight: bold;
+}
+
+.explanation-note {
+    color: #7f8c8d; /* Grey for notes */
+    font-style: italic;
+    font-size: 0.9em;
+}
+
+/* Button styles for info/secondary actions */
+.info-btn {
+    background-color: #3498db;
+    color: white;
+    padding: 8px 15px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background-color 0.3s;
+}
+
+.info-btn:hover {
+    background-color: #2980b9;
+}
+
+.btn--secondary {
+    background-color: #6c757d; /* A neutral grey for secondary actions */
+    color: white;
+    padding: 10px 15px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 16px;
+    transition: background-color 0.3s;
+    margin-top: 20px; /* Add some space above the button */
+}
+
+.btn--secondary:hover {
+    background-color: #5a6268;
+}
