@@ -384,6 +384,8 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('rule-item-type').value = rule.item_type || 'all';
             // Set match_all_conditions checkbox
             document.getElementById('rule-match-all-conditions').checked = rule.match_all_conditions || false;
+            // Set is_negative_match checkbox
+            document.getElementById('rule-is-negative-match').checked = rule.is_negative_match || false;
 
         } else {
             // Add mode
@@ -391,6 +393,7 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('rule-index').value = '';
             document.getElementById('rule-item-type').value = 'all'; // Default for new rules
             document.getElementById('rule-match-all-conditions').checked = false; // Default for new rules
+            document.getElementById('rule-is-negative-match').checked = false; // Default for new rules
         }
         ruleModal.classList.remove('hidden');
     }
@@ -438,6 +441,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const selectedGenreIds = Array.from(ruleForm.querySelectorAll('input[name="genres"]:checked')).map(cb => parseInt(cb.value, 10));
         const itemType = document.getElementById('rule-item-type').value;
         const matchAllConditions = document.getElementById('rule-match-all-conditions').checked;
+        const isNegativeMatch = document.getElementById('rule-is-negative-match').checked; // 获取负向匹配模式状态
 
         const yearInput = document.getElementById('rule-years').value.trim();
         let selectedYears = [];
@@ -471,7 +475,8 @@ document.addEventListener('DOMContentLoaded', function() {
             tag, 
             conditions: { countries: selectedCountries, genre_ids: selectedGenreIds, years: selectedYears, year_range_display: yearRange }, 
             item_type: itemType,
-            match_all_conditions: matchAllConditions
+            match_all_conditions: matchAllConditions,
+            is_negative_match: isNegativeMatch // 添加负向匹配模式
         };
 
         if (index) {

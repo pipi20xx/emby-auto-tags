@@ -18,7 +18,8 @@
         "year_range_display": "2023-2025"
       },
       "item_type": "all",
-      "match_all_conditions": false
+      "match_all_conditions": false,
+      "is_negative_match": false
     },
     {
       "name": "233",
@@ -30,7 +31,8 @@
         "year_range_display": null
       },
       "item_type": "all",
-      "match_all_conditions": false
+      "match_all_conditions": false,
+      "is_negative_match": false
     },
     {
       "name": "123",
@@ -44,7 +46,31 @@
         "year_range_display": null
       },
       "item_type": "all",
-      "match_all_conditions": false
+      "match_all_conditions": false,
+      "is_negative_match": false
+    },
+    {
+      "name": "排除测试",
+      "tag": "被排除了就在这里",
+      "conditions": {
+        "countries": [
+          "DE"
+        ],
+        "genre_ids": [
+          16,
+          18,
+          12,
+          14,
+          35,
+          10763,
+          9648
+        ],
+        "years": [],
+        "year_range_display": null
+      },
+      "item_type": "all",
+      "match_all_conditions": true,
+      "is_negative_match": true
     }
   ]
 }

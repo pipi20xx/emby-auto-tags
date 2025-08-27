@@ -17,6 +17,7 @@ class Rule(BaseModel):
     conditions: RuleCondition = Field(default_factory=RuleCondition)
     item_type: str = "all" # movie, series, all
     match_all_conditions: bool = False
+    is_negative_match: bool = False # 新增负向匹配模式
 
 @router.get("/", response_model=List[Rule])
 async def get_all_rules():

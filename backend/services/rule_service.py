@@ -47,6 +47,8 @@ def generate_tags(countries: List[str], genre_ids: List[int], media_year: Option
         rule_item_type = rule.get("item_type", "all") # 默认为 "all"
         # 新增：是否所有条件都必须匹配 (默认为 False，即模糊匹配)
         match_all_conditions = rule.get("match_all_conditions", False)
+        # 新增：是否为负向匹配模式 (默认为 False)
+        is_negative_match = rule.get("is_negative_match", False)
 
         rule_years = conditions.get("years", [])
 
@@ -55,26 +57,42 @@ def generate_tags(countries: List[str], genre_ids: List[int], media_year: Option
             continue
 
         # 检查国家匹配
-        # 如果规则中定义了国家，则根据 match_all_conditions 判断匹配方式
+        # 如果规则中定义了国家，则根据 is_negative_match 和 match_all_conditions 判断匹配方式
         if rule_countries:
-            if match_all_conditions:
-                # 必须所有国家都严格匹配（集合相等）
-                country_match = (set(countries) == set(rule_countries))
-            else:
-                # 只要有一个国家匹配
-                country_match = any(c in rule_countries for c in countries)
+            if is_negative_match:
+                if match_all_conditions:
+                    # 负向严格匹配：媒体国家集合不是规则国家集合的子集
+                    country_match = not set(countries).issubset(set(rule_countries))
+                else:
+                    # 负向模糊匹配：媒体国家集合与规则国家集合没有交集
+                    country_match = not any(c in rule_countries for c in countries)
+            else: # 正向匹配
+                if match_all_conditions:
+                    # 正向严格匹配：媒体国家集合完全等于规则国家集合
+                    country_match = (set(countries) == set(rule_countries))
+                else:
+                    # 正向模糊匹配：媒体国家集合与规则国家集合有交集
+                    country_match = any(c in rule_countries for c in countries)
         else:
             country_match = True # 如果规则中未定义国家，则视为通过
 
         # 检查类型匹配
-        # 如果规则中定义了类型，则根据 match_all_conditions 判断匹配方式
+        # 如果规则中定义了类型，则根据 is_negative_match 和 match_all_conditions 判断匹配方式
         if rule_genre_ids:
-            if match_all_conditions:
-                # 必须所有类型都严格匹配（集合相等）
-                genre_match = (set(genre_ids) == set(rule_genre_ids))
-            else:
-                # 只要有一个类型匹配
-                genre_match = any(gid in rule_genre_ids for gid in genre_ids)
+            if is_negative_match:
+                if match_all_conditions:
+                    # 负向严格匹配：媒体类型集合不是规则类型集合的子集
+                    genre_match = not set(genre_ids).issubset(set(rule_genre_ids))
+                else:
+                    # 负向模糊匹配：媒体类型集合与规则类型集合没有交集
+                    genre_match = not any(gid in rule_genre_ids for gid in genre_ids)
+            else: # 正向匹配
+                if match_all_conditions:
+                    # 正向严格匹配：媒体类型集合完全等于规则类型集合
+                    genre_match = (set(genre_ids) == set(rule_genre_ids))
+                else:
+                    # 正向模糊匹配：媒体类型集合与规则类型集合有交集
+                    genre_match = any(gid in rule_genre_ids for gid in genre_ids)
         else:
             genre_match = True # 如果规则中未定义类型，则视为通过
 
@@ -89,11 +107,37 @@ def generate_tags(countries: List[str], genre_ids: List[int], media_year: Option
         # 检查年份匹配
         year_match = True
         if rule_years and media_year:
-            year_match = (media_year in rule_years)
+            if is_negative_match:
+                # 负向匹配：媒体年份不在规则年份列表中
+                year_match = (media_year not in rule_years)
+            else:
+                # 正向匹配：媒体年份在规则年份列表中
+                year_match = (media_year in rule_years)
         elif rule_years and not media_year:
             year_match = False # 规则有年份要求但媒体没有年份信息，则不匹配
 
-        # 必须同时满足国家、类型、年份和媒体类型条件（如果它们被定义的话）
-        if country_match and genre_match and year_match and type_match:
+        # 组合判断逻辑
+        overall_match = False
+        
+        # 收集所有有效的匹配结果
+        individual_matches = []
+        if rule_countries:
+            individual_matches.append(country_match)
+        if rule_genre_ids:
+            individual_matches.append(genre_match)
+        if rule_years:
+            individual_matches.append(year_match)
+        # 媒体类型匹配总是需要考虑，除非规则的item_type是"all"
+        if rule_item_type != "all":
+            individual_matches.append(type_match)
+        
+        # 如果没有定义任何条件，则默认不匹配
+        if not individual_matches:
+            overall_match = False
+        else:
+            # 无论 match_all_conditions 是 True 还是 False，不同条件之间总是“与”关系
+            overall_match = all(individual_matches)
+
+        if overall_match:
             generated_tags.add(rule["tag"])
     return list(generated_tags)
