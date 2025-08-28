@@ -86,6 +86,21 @@
       "item_type": "movie",
       "match_all_conditions": false,
       "is_negative_match": true
+    },
+    {
+      "name": "1233",
+      "tag": "测试负向",
+      "conditions": {
+        "countries": [],
+        "genre_ids": [
+          10764
+        ],
+        "years": [],
+        "year_range_display": null
+      },
+      "item_type": "movie",
+      "match_all_conditions": false,
+      "is_negative_match": true
     }
   ]
 }

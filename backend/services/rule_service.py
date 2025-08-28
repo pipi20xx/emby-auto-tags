@@ -145,9 +145,6 @@ def generate_tags(countries: List[str], genre_ids: List[int], media_year: Option
             individual_positive_matches.append(genre_match)
         if rule_years:
             individual_positive_matches.append(year_match)
-        if rule_item_type != "all": # 媒体类型匹配总是需要考虑，除非规则的item_type是"all"
-            individual_positive_matches.append(type_match)
-        
         # 如果没有定义任何条件，则默认不匹配
         if not individual_positive_matches:
             pre_overall_match = False
@@ -155,10 +152,16 @@ def generate_tags(countries: List[str], genre_ids: List[int], media_year: Option
             # 无论 match_all_conditions 是 True 还是 False，不同条件之间总是“与”关系
             pre_overall_match = all(individual_positive_matches)
 
-        # --- 根据 is_negative_match 反转最终匹配结果 ---
-        overall_match = pre_overall_match
+        # --- 根据 is_negative_match 反转初步匹配结果 ---
+        overall_match_excluding_type = pre_overall_match
         if is_negative_match:
-            overall_match = not pre_overall_match
+            overall_match_excluding_type = not pre_overall_match
+
+        # 最终匹配结果：在考虑负向匹配后，还需要满足媒体类型匹配（如果规则定义了媒体类型）
+        # 媒体类型匹配不参与负向匹配的反转
+        overall_match = overall_match_excluding_type
+        if rule_item_type != "all":
+            overall_match = overall_match and type_match
 
         if overall_match:
             generated_tags.add(rule["tag"])
