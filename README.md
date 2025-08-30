@@ -7,6 +7,10 @@
 <details>
 <summary>点击展开/折叠</summary>
 
+- **v1.0.20 (2025-08-30)**
+  - **新增功能**: 添加了浏览器页面标签图标 (favicon)。
+    - 在 `backend/templates/manage.html` 中引入了 `/static/img/favicon.svg` 作为页面图标。
+    - 用户需将 `favicon.svg` 文件放置在 `backend/static/img/` 目录下。
 - **v1.0.19 (2025-08-28)**
   - **修复**: 修正了负向匹配中“作用范围”（`item_type`）的逻辑。
     - 现在 `item_type` 的匹配结果将始终保持正向，不再受“负向匹配”选项的反转影响，确保其作为独立的条件进行判断。
