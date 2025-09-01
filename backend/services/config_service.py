@@ -38,6 +38,23 @@ def get_config() -> dict:
         config.set('TMDB', 'rate_limit_period', '1.0') # 默认1秒1次，0表示不限制
         needs_saving = True
 
+    # --- 登录配置自动生成 ---
+    if not config.has_section('LOGIN'):
+        config.add_section('LOGIN')
+        needs_saving = True
+    if not config.has_option('LOGIN', 'enabled'):
+        config.set('LOGIN', 'enabled', 'false')
+        needs_saving = True
+    if not config.has_option('LOGIN', 'username'):
+        config.set('LOGIN', 'username', 'admin')
+        needs_saving = True
+    if not config.has_option('LOGIN', 'password'):
+        config.set('LOGIN', 'password', 'password')
+        needs_saving = True
+    if not config.has_option('LOGIN', 'secret_key'):
+        config.set('LOGIN', 'secret_key', secrets.token_hex(32))
+        needs_saving = True
+
     if needs_saving:
         try:
             with open(CONFIG_FILE_PATH, 'w', encoding='utf-8') as configfile:

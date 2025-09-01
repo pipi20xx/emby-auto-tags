@@ -37,6 +37,14 @@ document.addEventListener('DOMContentLoaded', function() {
     const saveConfigBtn = document.getElementById('save-config-btn');
     const configResult = document.getElementById('config-result');
 
+    // --- 登录设置 ---
+    const loginConfigForm = document.getElementById('login-config-form');
+    const saveLoginConfigBtn = document.getElementById('save-login-config-btn');
+    const loginConfigResult = document.getElementById('login-config-result');
+    const loginEnabledCheckbox = document.getElementById('login-enabled');
+    const loginUsernameInput = document.getElementById('login-username');
+    const loginPasswordInput = document.getElementById('login-password');
+
     // --- Webhook 管理 ---
     const webhookEnabledCheckbox = document.getElementById('webhook-enabled');
     const automationEnabledCheckbox = document.getElementById('automation-enabled');
@@ -115,6 +123,13 @@ document.addEventListener('DOMContentLoaded', function() {
             // 更新 Webhook UI
             updateWebhookUI(config);
 
+            // 更新登录设置 UI
+            if (config.LOGIN) {
+                loginEnabledCheckbox.checked = config.LOGIN.enabled === 'true';
+                loginUsernameInput.value = config.LOGIN.username || '';
+                loginPasswordInput.value = ''; // 密码字段不回填
+            }
+
             configForm.innerHTML = '';
             const sectionNames = {
                 "DEFAULT": "通用设置",
@@ -134,9 +149,9 @@ document.addEventListener('DOMContentLoaded', function() {
             const defaultConfig = config['DEFAULT'] || {};
             
             for (const section in config) {
-                // WEBHOOK 部分由专门的 UI 处理，不在此处动态生成
-                if (section === 'WEBHOOK') {
-                    continue; 
+                // WEBHOOK and LOGIN sections are handled by dedicated UI
+                if (section === 'WEBHOOK' || section === 'LOGIN') {
+                    continue;
                 }
                 const fieldset = document.createElement('fieldset');
                 const legend = document.createElement('legend');
@@ -924,4 +939,39 @@ document.addEventListener('DOMContentLoaded', function() {
     // --- 初始化 ---
     loadConfig();
     loadInitialData();
+
+    // --- 登录设置保存 ---
+    saveLoginConfigBtn.addEventListener('click', async () => {
+        const newConfig = {
+            ...currentFullConfig,
+            LOGIN: {
+                ...(currentFullConfig.LOGIN || {}),
+                enabled: loginEnabledCheckbox.checked.toString(),
+                username: loginUsernameInput.value,
+            }
+        };
+
+        const newPassword = loginPasswordInput.value;
+        if (newPassword) {
+            newConfig.LOGIN.password = newPassword;
+        }
+
+        showLoading(saveLoginConfigBtn);
+        try {
+            const response = await fetch(`${apiPrefix}/config`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(newConfig)
+            });
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.detail || '保存失败');
+            showToast("登录设置保存成功！");
+            // 重新加载以更新 currentFullConfig
+            setTimeout(loadConfig, 1000);
+        } catch (error) {
+            showToast(`错误: ${error.message}`, true);
+        } finally {
+            showLoading(saveLoginConfigBtn, false);
+        }
+    });
 });

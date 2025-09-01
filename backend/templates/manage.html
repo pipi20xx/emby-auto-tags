@@ -10,7 +10,10 @@
     <link rel="icon" type="image/svg+xml" href="/static/img/favicon.svg">
 </head>
 <body>
-    <h1>Emby 自动标签 - 管理面板</h1>
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <h1>Emby 自动标签 - 管理面板</h1>
+        <a href="/logout" class="button">登出</a>
+    </div>
 
     <!-- Webhook 管理 -->
     <div class="container">
@@ -62,6 +65,29 @@
         </form>
         <button id="save-config-btn">保存配置</button>
         <div id="config-result" class="result hidden"></div>
+    </div>
+
+    <!-- 登录设置 -->
+    <div class="container">
+        <h2>登录设置</h2>
+        <form id="login-config-form">
+            <div style="margin-bottom: 15px;">
+                <label style="display: flex; align-items: center; font-weight: normal;">
+                    <input type="checkbox" id="login-enabled" style="width: auto; margin-right: 10px;">
+                    <strong>启用登录验证</strong>
+                </label>
+            </div>
+            <div style="margin-bottom: 15px;">
+                <label for="login-username">用户名:</label>
+                <input type="text" id="login-username">
+            </div>
+            <div style="margin-bottom: 15px;">
+                <label for="login-password">新密码 (留空则不修改):</label>
+                <input type="password" id="login-password">
+            </div>
+        </form>
+        <button id="save-login-config-btn">保存登录设置</button>
+        <div id="login-config-result" class="result hidden"></div>
     </div>
 
     <!-- TMDB 测试 -->

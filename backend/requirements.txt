@@ -6,3 +6,5 @@ ratelimit
 backoff
 jinja2
 aiofiles
+python-jose[cryptography]
+python-multipart
