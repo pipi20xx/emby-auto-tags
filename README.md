@@ -2,6 +2,8 @@
 
 这是一个用于 Emby 的辅助工具，它通过接收 Emby 的 Webhook 通知，根据用户自定义的规则，自动为电影和剧集添加标签。
 
+项目已经停更 功能已经迁移到 https://github.com/pipi20xx/EmbyLens
+
 ## 更新日志
 
 <details>
